@@ -12,7 +12,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/strand1/fernwood/pkg/config"
 	"github.com/strand1/fernwood/pkg/logger"
+	"github.com/strand1/fernwood/pkg/memory"
 	"github.com/strand1/fernwood/pkg/providers"
 	"github.com/strand1/fernwood/pkg/skills"
 )
@@ -21,6 +23,7 @@ type ContextBuilder struct {
 	workspace    string
 	skillsLoader *skills.SkillsLoader
 	memory       *MemoryStore
+	mulch        *memory.MulchManager
 
 	// Cache for system prompt to avoid rebuilding on every call.
 	// This fixes issue #607: repeated reprocessing of the entire context.
@@ -52,20 +55,25 @@ func getGlobalConfigDir() string {
 	return filepath.Join(home, ".picoclaw")
 }
 
-func NewContextBuilder(workspace string) *ContextBuilder {
+func NewContextBuilder(workspace string, cfg *config.Config) *ContextBuilder {
 	// builtin skills: skills directory in current project
 	// Use the skills/ directory under the current working directory
-	builtinSkillsDir := strings.TrimSpace(os.Getenv("PICOCLAW_BUILTIN_SKILLS"))
+	builtinSkillsDir := strings.TrimSpace(os.Getenv("FERNWOOD_BUILTIN_SKILLS"))
 	if builtinSkillsDir == "" {
 		wd, _ := os.Getwd()
 		builtinSkillsDir = filepath.Join(wd, "skills")
 	}
 	globalSkillsDir := filepath.Join(getGlobalConfigDir(), "skills")
 
+	// Initialize mulch manager
+	mulchMgr := memory.NewMulchManager(cfg.Mulch.BinPath, cfg.Mulch.Enabled, cfg.Mulch.Domains)
+	_ = mulchMgr.Init() // Safe to ignore error; Prime() will return empty if not initialized
+
 	return &ContextBuilder{
 		workspace:    workspace,
 		skillsLoader: skills.NewSkillsLoader(workspace, globalSkillsDir, builtinSkillsDir),
 		memory:       NewMemoryStore(workspace),
+		mulch:        mulchMgr,
 	}
 }
 
@@ -120,6 +128,12 @@ The following skills extend your capabilities. To use a skill, read its SKILL.md
 	memoryContext := cb.memory.GetMemoryContext()
 	if memoryContext != "" {
 		parts = append(parts, "# Memory\n\n"+memoryContext)
+	}
+
+	// Expertise from Mulch (persistent learnings)
+	expertise := cb.mulch.Prime()
+	if expertise != "" {
+		parts = append(parts, "# Project Expertise (from previous sessions)\n\n"+expertise)
 	}
 
 	// Join with "---" separator

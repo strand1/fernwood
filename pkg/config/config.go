@@ -58,6 +58,7 @@ type Config struct {
 	Tools     ToolsConfig     `json:"tools"`
 	Heartbeat HeartbeatConfig `json:"heartbeat"`
 	Devices   DevicesConfig   `json:"devices"`
+	Mulch     MulchConfig     `json:"mulch"`
 }
 
 // MarshalJSON implements custom JSON marshaling for Config
@@ -457,6 +458,13 @@ type HeartbeatConfig struct {
 type DevicesConfig struct {
 	Enabled    bool `json:"enabled"     env:"PICOCLAW_DEVICES_ENABLED"`
 	MonitorUSB bool `json:"monitor_usb" env:"PICOCLAW_DEVICES_MONITOR_USB"`
+}
+
+type MulchConfig struct {
+	Enabled    bool     `json:"enabled"    env:"MULCH_ENABLED"`
+	BinPath    string   `json:"bin"        env:"MULCH_BIN"`
+	AutoRecord bool     `json:"auto_record" env:"MULCH_AUTO_RECORD"`
+	Domains    []string `json:"domains"`
 }
 
 type ProvidersConfig struct {
