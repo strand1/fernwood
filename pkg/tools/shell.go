@@ -146,6 +146,31 @@ func NewExecToolWithConfig(workingDir string, restrict bool, config *config.Conf
 	}, nil
 }
 
+// BashTool is an alias for ExecTool with the name "bash" instead of "exec".
+type BashTool struct {
+	*ExecTool
+}
+
+func NewBashTool(workingDir string, restrict bool) (*BashTool, error) {
+	execTool, err := NewExecTool(workingDir, restrict)
+	if err != nil {
+		return nil, err
+	}
+	return &BashTool{ExecTool: execTool}, nil
+}
+
+func NewBashToolWithConfig(workingDir string, restrict bool, config *config.Config) (*BashTool, error) {
+	execTool, err := NewExecToolWithConfig(workingDir, restrict, config)
+	if err != nil {
+		return nil, err
+	}
+	return &BashTool{ExecTool: execTool}, nil
+}
+
+func (t *BashTool) Name() string {
+	return "bash"
+}
+
 func (t *ExecTool) Name() string {
 	return "exec"
 }

@@ -101,7 +101,7 @@ func (t *ReadFileTool) Name() string {
 }
 
 func (t *ReadFileTool) Description() string {
-	return "Read the contents of a file"
+	return "Read the contents of a file with optional line range and line numbers. If no path is provided, lists the current directory."
 }
 
 func (t *ReadFileTool) Parameters() map[string]any {
@@ -110,24 +110,100 @@ func (t *ReadFileTool) Parameters() map[string]any {
 		"properties": map[string]any{
 			"path": map[string]any{
 				"type":        "string",
-				"description": "Path to the file to read",
+				"description": "Path to the file to read. If omitted, lists the directory.",
+			},
+			"start_line": map[string]any{
+				"type":        "integer",
+				"description": "Optional starting line number (1-indexed). If omitted, starts from first line.",
+			},
+			"end_line": map[string]any{
+				"type":        "integer",
+				"description": "Optional ending line number (inclusive). If omitted, reads to end of file.",
+			},
+			"line_numbers": map[string]any{
+				"type":        "boolean",
+				"description": "Optional: prepend line numbers to each line. Default is false.",
 			},
 		},
-		"required": []string{"path"},
+		"required": []string{},
 	}
 }
 
 func (t *ReadFileTool) Execute(ctx context.Context, args map[string]any) *ToolResult {
-	path, ok := args["path"].(string)
-	if !ok {
-		return ErrorResult("path is required")
+	path, _ := args["path"].(string) // Optional now
+
+	// If no path, list directory
+	if path == "" {
+		entries, err := t.fs.ReadDir(".")
+		if err != nil {
+			return ErrorResult(fmt.Sprintf("failed to list current directory: %v", err))
+		}
+		return formatDirEntries(entries)
 	}
 
 	content, err := t.fs.ReadFile(path)
 	if err != nil {
 		return ErrorResult(err.Error())
 	}
-	return NewToolResult(string(content))
+
+	// Parse optional parameters
+	startLine := 0
+	endLine := 0
+	lineNumbers := false
+
+	if v, ok := args["start_line"].(int); ok {
+		if v < 1 {
+			return ErrorResult("start_line must be >= 1")
+		}
+		startLine = v
+	}
+	if v, ok := args["end_line"].(int); ok {
+		if v < 1 {
+			return ErrorResult("end_line must be >= 1")
+		}
+		endLine = v
+	}
+	if v, ok := args["line_numbers"].(bool); ok {
+		lineNumbers = v
+	}
+
+	// Split into lines
+	lines := strings.Split(string(content), "\n")
+	totalLines := len(lines)
+
+	// Apply range
+	if startLine > 0 || endLine > 0 {
+		// Convert to 0-indexed
+		startIdx := startLine - 1
+		endIdx := endLine - 1 // inclusive
+
+		if startIdx < 0 {
+			startIdx = 0
+		}
+		if endIdx >= totalLines {
+			endIdx = totalLines - 1
+		}
+		if startIdx > endIdx {
+			return ErrorResult("start_line cannot be greater than end_line")
+		}
+		lines = lines[startIdx : endIdx+1]
+	}
+
+	// Apply line numbering if requested
+	if lineNumbers {
+		for i, line := range lines {
+			// Format: "1\t<content>"
+			lines[i] = fmt.Sprintf("%d\t%s", startLine+i, line)
+		}
+	}
+
+	result := strings.Join(lines, "\n")
+	if lineNumbers && len(lines) > 0 && !strings.HasSuffix(result, "\n") {
+		// Add trailing newline if we numbered lines (for consistency)
+		result += "\n"
+	}
+
+	return NewToolResult(result)
 }
 
 type WriteFileTool struct {
