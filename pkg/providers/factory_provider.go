@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sipeed/picoclaw/pkg/config"
+	"github.com/strand1/fernwood/pkg/config"
 )
 
 // createClaudeAuthProvider creates a Claude provider using OAuth credentials from auth store.

@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/sipeed/picoclaw/pkg/config"
+	"github.com/strand1/fernwood/pkg/config"
 )
 
 // registerPicoRoutes binds Pico Channel management endpoints to the ServeMux.

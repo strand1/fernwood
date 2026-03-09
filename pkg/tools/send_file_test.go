@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sipeed/picoclaw/pkg/config"
-	"github.com/sipeed/picoclaw/pkg/media"
+	"github.com/strand1/fernwood/pkg/config"
+	"github.com/strand1/fernwood/pkg/media"
 )
 
 func TestSendFileTool_MissingPath(t *testing.T) {

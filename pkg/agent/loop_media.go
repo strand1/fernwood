@@ -15,9 +15,9 @@ import (
 
 	"github.com/h2non/filetype"
 
-	"github.com/sipeed/picoclaw/pkg/logger"
-	"github.com/sipeed/picoclaw/pkg/media"
-	"github.com/sipeed/picoclaw/pkg/providers"
+	"github.com/strand1/fernwood/pkg/logger"
+	"github.com/strand1/fernwood/pkg/media"
+	"github.com/strand1/fernwood/pkg/providers"
 )
 
 // resolveMediaRefs replaces media:// refs in message Media fields with base64 data URLs.

@@ -7,7 +7,7 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 
-	picoclawconfig "github.com/sipeed/picoclaw/pkg/config"
+	picoclawconfig "github.com/strand1/fernwood/pkg/config"
 )
 
 func (s *appState) buildChannelMenuItems() []MenuItem {

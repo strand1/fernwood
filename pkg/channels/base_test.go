@@ -3,8 +3,8 @@ package channels
 import (
 	"testing"
 
-	"github.com/sipeed/picoclaw/pkg/bus"
-	"github.com/sipeed/picoclaw/pkg/config"
+	"github.com/strand1/fernwood/pkg/bus"
+	"github.com/strand1/fernwood/pkg/config"
 )
 
 func TestBaseChannelIsAllowed(t *testing.T) {

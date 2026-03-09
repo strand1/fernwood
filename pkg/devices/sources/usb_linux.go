@@ -10,8 +10,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/sipeed/picoclaw/pkg/devices/events"
-	"github.com/sipeed/picoclaw/pkg/logger"
+	"github.com/strand1/fernwood/pkg/devices/events"
+	"github.com/strand1/fernwood/pkg/logger"
 )
 
 var usbClassToCapability = map[string]string{

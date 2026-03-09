@@ -22,9 +22,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/sipeed/picoclaw/web/backend/api"
-	"github.com/sipeed/picoclaw/web/backend/launcherconfig"
-	"github.com/sipeed/picoclaw/web/backend/middleware"
+	"github.com/strand1/fernwood/web/backend/api"
+	"github.com/strand1/fernwood/web/backend/launcherconfig"
+	"github.com/strand1/fernwood/web/backend/middleware"
 )
 
 func main() {

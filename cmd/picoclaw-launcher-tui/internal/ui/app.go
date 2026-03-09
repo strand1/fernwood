@@ -10,8 +10,8 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 
-	configstore "github.com/sipeed/picoclaw/cmd/picoclaw-launcher-tui/internal/config"
-	picoclawconfig "github.com/sipeed/picoclaw/pkg/config"
+	configstore "github.com/strand1/fernwood/cmd/picoclaw-launcher-tui/internal/config"
+	picoclawconfig "github.com/strand1/fernwood/pkg/config"
 )
 
 type appState struct {

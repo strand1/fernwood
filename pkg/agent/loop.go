@@ -12,28 +12,26 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
-	"github.com/sipeed/picoclaw/pkg/bus"
-	"github.com/sipeed/picoclaw/pkg/channels"
-	"github.com/sipeed/picoclaw/pkg/commands"
-	"github.com/sipeed/picoclaw/pkg/config"
-	"github.com/sipeed/picoclaw/pkg/constants"
-	"github.com/sipeed/picoclaw/pkg/logger"
-	"github.com/sipeed/picoclaw/pkg/mcp"
-	"github.com/sipeed/picoclaw/pkg/media"
-	"github.com/sipeed/picoclaw/pkg/providers"
-	"github.com/sipeed/picoclaw/pkg/routing"
-	"github.com/sipeed/picoclaw/pkg/skills"
-	"github.com/sipeed/picoclaw/pkg/state"
-	"github.com/sipeed/picoclaw/pkg/tools"
-	"github.com/sipeed/picoclaw/pkg/utils"
-	"github.com/sipeed/picoclaw/pkg/voice"
+	"github.com/strand1/fernwood/pkg/bus"
+	"github.com/strand1/fernwood/pkg/channels"
+	"github.com/strand1/fernwood/pkg/commands"
+	"github.com/strand1/fernwood/pkg/config"
+	"github.com/strand1/fernwood/pkg/constants"
+	"github.com/strand1/fernwood/pkg/logger"
+	"github.com/strand1/fernwood/pkg/mcp"
+	"github.com/strand1/fernwood/pkg/media"
+	"github.com/strand1/fernwood/pkg/providers"
+	"github.com/strand1/fernwood/pkg/routing"
+	"github.com/strand1/fernwood/pkg/skills"
+	"github.com/strand1/fernwood/pkg/state"
+	"github.com/strand1/fernwood/pkg/tools"
+	"github.com/strand1/fernwood/pkg/utils"
 )
 
 type AgentLoop struct {
@@ -46,7 +44,6 @@ type AgentLoop struct {
 	fallback       *providers.FallbackChain
 	channelManager *channels.Manager
 	mediaStore     media.MediaStore
-	transcriber    voice.Transcriber
 	cmdRegistry    *commands.Registry
 }
 
@@ -160,13 +157,6 @@ func registerSharedTools(
 			}
 		}
 
-		// Hardware tools (I2C, SPI) - Linux only, returns error on other platforms
-		if cfg.Tools.IsToolEnabled("i2c") {
-			agent.Tools.Register(tools.NewI2CTool())
-		}
-		if cfg.Tools.IsToolEnabled("spi") {
-			agent.Tools.Register(tools.NewSPITool())
-		}
 
 		// Message tool
 		if cfg.Tools.IsToolEnabled("message") {
@@ -404,63 +394,7 @@ func (al *AgentLoop) SetMediaStore(s media.MediaStore) {
 	})
 }
 
-// SetTranscriber injects a voice transcriber for agent-level audio transcription.
-func (al *AgentLoop) SetTranscriber(t voice.Transcriber) {
-	al.transcriber = t
-}
 
-var audioAnnotationRe = regexp.MustCompile(`\[(voice|audio)(?::[^\]]*)?\]`)
-
-// transcribeAudioInMessage resolves audio media refs, transcribes them, and
-// replaces audio annotations in msg.Content with the transcribed text.
-func (al *AgentLoop) transcribeAudioInMessage(ctx context.Context, msg bus.InboundMessage) bus.InboundMessage {
-	if al.transcriber == nil || al.mediaStore == nil || len(msg.Media) == 0 {
-		return msg
-	}
-
-	// Transcribe each audio media ref in order.
-	var transcriptions []string
-	for _, ref := range msg.Media {
-		path, meta, err := al.mediaStore.ResolveWithMeta(ref)
-		if err != nil {
-			logger.WarnCF("voice", "Failed to resolve media ref", map[string]any{"ref": ref, "error": err})
-			continue
-		}
-		if !utils.IsAudioFile(meta.Filename, meta.ContentType) {
-			continue
-		}
-		result, err := al.transcriber.Transcribe(ctx, path)
-		if err != nil {
-			logger.WarnCF("voice", "Transcription failed", map[string]any{"ref": ref, "error": err})
-			transcriptions = append(transcriptions, "")
-			continue
-		}
-		transcriptions = append(transcriptions, result.Text)
-	}
-
-	if len(transcriptions) == 0 {
-		return msg
-	}
-
-	// Replace audio annotations sequentially with transcriptions.
-	idx := 0
-	newContent := audioAnnotationRe.ReplaceAllStringFunc(msg.Content, func(match string) string {
-		if idx >= len(transcriptions) {
-			return match
-		}
-		text := transcriptions[idx]
-		idx++
-		return "[voice: " + text + "]"
-	})
-
-	// Append any remaining transcriptions not matched by an annotation.
-	for ; idx < len(transcriptions); idx++ {
-		newContent += "\n[voice: " + transcriptions[idx] + "]"
-	}
-
-	msg.Content = newContent
-	return msg
-}
 
 // inferMediaType determines the media type ("image", "audio", "video", "file")
 // from a filename and MIME content type.
@@ -573,7 +507,7 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 		},
 	)
 
-	msg = al.transcribeAudioInMessage(ctx, msg)
+
 
 	// Route system messages to processSystemMessage
 	if msg.Channel == "system" {

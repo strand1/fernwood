@@ -8,11 +8,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/sipeed/picoclaw/pkg/config"
-	"github.com/sipeed/picoclaw/pkg/providers"
-	"github.com/sipeed/picoclaw/pkg/routing"
-	"github.com/sipeed/picoclaw/pkg/session"
-	"github.com/sipeed/picoclaw/pkg/tools"
+	"github.com/strand1/fernwood/pkg/config"
+	"github.com/strand1/fernwood/pkg/providers"
+	"github.com/strand1/fernwood/pkg/routing"
+	"github.com/strand1/fernwood/pkg/session"
+	"github.com/strand1/fernwood/pkg/tools"
 )
 
 // AgentInstance represents a fully configured agent with its own workspace,
