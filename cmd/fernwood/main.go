@@ -24,13 +24,13 @@ import (
 	"github.com/strand1/fernwood/cmd/fernwood/internal/version"
 )
 
-func NewPicoclawCommand() *cobra.Command {
-	short := fmt.Sprintf("%s picoclaw - Personal AI Assistant v%s\n\n", internal.Logo, internal.GetVersion())
+func NewFernwoodCommand() *cobra.Command {
+	short := fmt.Sprintf("%s fernwood - Agentic Coding Harness v%s\n\n", internal.Logo, internal.GetVersion())
 
 	cmd := &cobra.Command{
-		Use:     "picoclaw",
+		Use: "fernwood",
 		Short:   short,
-		Example: "picoclaw version",
+		Example: "fernwood version",
 	}
 
 	cmd.AddCommand(
@@ -63,7 +63,7 @@ const (
 
 func main() {
 	fmt.Printf("%s", banner)
-	cmd := NewPicoclawCommand()
+	cmd := NewFernwoodCommand()
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)
 	}

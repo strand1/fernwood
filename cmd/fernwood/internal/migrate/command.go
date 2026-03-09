@@ -11,7 +11,7 @@ func NewMigrateCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "migrate",
-		Short: "Migrate from xxxclaw(openclaw, etc.) to picoclaw",
+		Short: "Migrate from xxxclaw(openclaw, etc.) to fernwood",
 		Args:  cobra.NoArgs,
 		Example: `  picoclaw migrate
   picoclaw migrate --from openclaw

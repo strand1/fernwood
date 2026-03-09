@@ -25,7 +25,7 @@ func GetPicoclawHome() string {
 		return home
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".picoclaw")
+	return filepath.Join(home, ".fernwood")
 }
 
 func GetConfigPath() string {
