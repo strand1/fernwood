@@ -122,7 +122,7 @@ func (t *ReadFileTool) Parameters() map[string]any {
 			},
 			"line_numbers": map[string]any{
 				"type":        "boolean",
-				"description": "Optional: prepend line numbers to each line. Default is false.",
+				"description": "Optional: prepend line numbers to each line. Default is true.",
 			},
 		},
 		"required": []string{},
@@ -149,7 +149,7 @@ func (t *ReadFileTool) Execute(ctx context.Context, args map[string]any) *ToolRe
 	// Parse optional parameters
 	startLine := 0
 	endLine := 0
-	lineNumbers := false
+	lineNumbers := true
 
 	if v, ok := args["start_line"].(int); ok {
 		if v < 1 {
