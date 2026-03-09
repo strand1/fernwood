@@ -66,7 +66,7 @@ func NewContextBuilder(workspace string, cfg *config.Config) *ContextBuilder {
 	globalSkillsDir := filepath.Join(getGlobalConfigDir(), "skills")
 
 	// Initialize mulch manager
-	mulchMgr := memory.NewMulchManager(cfg.Mulch.BinPath, cfg.Mulch.Enabled, cfg.Mulch.Domains)
+	mulchMgr := memory.NewMulchManager(workspace, cfg.Mulch.BinPath, cfg.Mulch.Enabled, cfg.Mulch.Domains)
 	_ = mulchMgr.Init() // Safe to ignore error; Prime() will return empty if not initialized
 
 	return &ContextBuilder{

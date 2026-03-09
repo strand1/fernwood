@@ -1,42 +1,67 @@
 package memory
 
 import (
+	"log"
 	"os/exec"
 	"strings"
 )
 
 type MulchManager struct {
-	BinPath   string
-	Enabled   bool
-	Domains   []string
+	BinPath    string
+	Enabled    bool
+	Domains    []string
+	WorkingDir string
 }
 
-func NewMulchManager(binPath string, enabled bool, domains []string) *MulchManager {
+func NewMulchManager(workingDir, binPath string, enabled bool, domains []string) *MulchManager {
 	if binPath == "" {
 		binPath = "mulch"
 	}
 	if len(domains) == 0 {
 		domains = []string{"code", "errors", "decisions"}
 	}
-	return &MulchManager{BinPath: binPath, Enabled: enabled, Domains: domains}
+	return &MulchManager{
+		BinPath:    binPath,
+		Enabled:    enabled,
+		Domains:    domains,
+		WorkingDir: workingDir,
+	}
 }
 
-// Init ensures .mulch/ exists in the current directory. Safe to call multiple times.
+// Init ensures .mulch/ exists in the workspace. Safe to call multiple times.
 func (m *MulchManager) Init() error {
 	if !m.Enabled {
 		return nil
 	}
-	return exec.Command(m.BinPath, "init").Run()
+	cmd := exec.Command(m.BinPath, "init")
+	if m.WorkingDir != "" {
+		cmd.Dir = m.WorkingDir
+	}
+	if err := cmd.Run(); err != nil {
+		log.Printf("[mulch] init failed: %v", err)
+		return err
+	}
+	return nil
 }
 
 // Prime returns expertise context to inject into the system prompt.
-// Returns empty string silently if mulch is not initialized or not enabled.
+// It primes only the configured domains. Returns empty string on error or if no output.
 func (m *MulchManager) Prime() string {
 	if !m.Enabled {
 		return ""
 	}
-	out, err := exec.Command(m.BinPath, "prime").Output()
+	args := []string{"prime"}
+	// Append domains if configured
+	if len(m.Domains) > 0 {
+		args = append(args, m.Domains...)
+	}
+	cmd := exec.Command(m.BinPath, args...)
+	if m.WorkingDir != "" {
+		cmd.Dir = m.WorkingDir
+	}
+	out, err := cmd.Output()
 	if err != nil {
+		log.Printf("[mulch] prime failed: %v", err)
 		return ""
 	}
 	return strings.TrimSpace(string(out))
@@ -53,7 +78,15 @@ func (m *MulchManager) Record(domain, recordType, content string) error {
 	if !m.Enabled || content == "" {
 		return nil
 	}
-	return exec.Command(m.BinPath, "record", domain, "--type", recordType, content).Run()
+	cmd := exec.Command(m.BinPath, "record", domain, "--type", recordType, content)
+	if m.WorkingDir != "" {
+		cmd.Dir = m.WorkingDir
+	}
+	if err := cmd.Run(); err != nil {
+		log.Printf("[mulch] record failed: %v", err)
+		return err
+	}
+	return nil
 }
 
 // RecordBatch records multiple learnings, typically called at session end.

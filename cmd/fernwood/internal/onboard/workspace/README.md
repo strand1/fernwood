@@ -1,0 +1,1 @@
+# Fernwood default workspace
