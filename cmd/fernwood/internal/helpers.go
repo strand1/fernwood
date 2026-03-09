@@ -19,9 +19,9 @@ var (
 )
 
 // GetPicoclawHome returns the picoclaw home directory.
-// Priority: $PICOCLAW_HOME > ~/.picoclaw
+// Priority: $FERNWOOD_HOME > ~/.picoclaw
 func GetPicoclawHome() string {
-	if home := os.Getenv("PICOCLAW_HOME"); home != "" {
+	if home := os.Getenv("FERNWOOD_HOME"); home != "" {
 		return home
 	}
 	home, _ := os.UserHomeDir()
@@ -29,7 +29,7 @@ func GetPicoclawHome() string {
 }
 
 func GetConfigPath() string {
-	if configPath := os.Getenv("PICOCLAW_CONFIG"); configPath != "" {
+	if configPath := os.Getenv("FERNWOOD_CONFIG"); configPath != "" {
 		return configPath
 	}
 	return filepath.Join(GetPicoclawHome(), "config.json")

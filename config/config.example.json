@@ -1,7 +1,7 @@
 {
   "agents": {
     "defaults": {
-      "workspace": "~/.picoclaw/workspace",
+      "workspace": "~/.fernwood/workspace",
       "restrict_to_workspace": true,
       "model_name": "gpt4",
       "max_tokens": 8192,
@@ -462,5 +462,11 @@
   "gateway": {
     "host": "127.0.0.1",
     "port": 18790
+  },
+  "mulch": {
+    "enabled": false,
+    "bin": "mulch",
+    "auto_record": false,
+    "domains": ["code", "errors", "decisions"]
   }
 }
