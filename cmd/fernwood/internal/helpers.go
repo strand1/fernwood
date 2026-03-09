@@ -9,7 +9,7 @@ import (
 	"github.com/strand1/fernwood/pkg/config"
 )
 
-const Logo = "🦞"
+const Logo = "🌲"
 
 var (
 	version   = "dev"

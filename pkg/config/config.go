@@ -676,6 +676,7 @@ type ToolsConfig struct {
 	Web             WebToolsConfig     `json:"web"`
 	Cron            CronToolsConfig    `json:"cron"`
 	Exec            ExecConfig         `json:"exec"`
+	Bash            ToolConfig         `json:"bash"                                                  envPrefix:"PICOCLAW_TOOLS_BASH_"`
 	Skills          SkillsToolsConfig  `json:"skills"`
 	MediaCleanup    MediaCleanupConfig `json:"media_cleanup"`
 	MCP             MCPConfig          `json:"mcp"`
@@ -933,6 +934,8 @@ func (t *ToolsConfig) IsToolEnabled(name string) bool {
 		return t.Cron.Enabled
 	case "exec":
 		return t.Exec.Enabled
+	case "bash":
+		return t.Bash.Enabled
 	case "skills":
 		return t.Skills.Enabled
 	case "media_cleanup":

@@ -85,6 +85,12 @@ func NewAgentInstance(
 		}
 		toolsRegistry.Register(execTool)
 	}
+	if cfg.Tools.IsToolEnabled("bash") {
+		bashTool, err := tools.NewBashToolWithConfig(workspace, restrict, cfg)
+		if err == nil {
+			toolsRegistry.Register(bashTool)
+		}
+	}
 
 	if cfg.Tools.IsToolEnabled("edit_file") {
 		toolsRegistry.Register(tools.NewEditFileTool(workspace, restrict, allowWritePaths))
