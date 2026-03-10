@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/fernwood_01.png" alt="Fernwood" width="200"/>
+  <img src="assets/fernwood_logo.png" alt="Fernwood" width="200"/>
 </p>
 
 <h1 align="center">Fernwood 🌲</h1>
