@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/fernwood_logo.png" alt="Fernwood" width="200"/>
+  <img src="assets/fernwood_01.png" alt="Fernwood" width="200"/>
 </p>
 
 <h1 align="center">Fernwood 🌲</h1>
@@ -17,20 +17,20 @@
 
 ---
 
-Fernwood is a lightweight agentic coding harness forked from [PicoClaw](https://github.com/sipeed/picoclaw). It strips the hardware bot and chat app integrations down to what matters for software development: a fast, local coding agent with four sharp tools and memory that persists across sessions.
+Fernwood is a lightweight agentic coding harness forked from [PicoClaw](https://github.com/sipeed/picoclaw). 
+It focuses on local software development workflows and provides a small set of core tools along with persistent memory across sessions.
 
 **What's different from PicoClaw:**
-- Stripped to a coding-focused toolset (`read_file`, `write_file`, `edit_file`, `bash`)
+- Coding-focused toolset (`read_file`, `write_file`, `edit_file`, `bash`)
 - Agent identity and system prompt rewritten for software development
 - [Mulch](https://github.com/jayminwest/mulch) integration — expertise accumulates across sessions
-- No Telegram, no WeChat, no hardware channels (Discord optional)
 - Dependencies halved (~53 vs ~106 direct deps)
 
 **What's inherited from PicoClaw:**
 - Single self-contained Go binary
 - Fast startup, low memory footprint
 - Solid tool loop and agent orchestration
-- Discord channel (still works if you want it)
+- Chat apps
 
 ---
 
@@ -150,9 +150,9 @@ With Mulch disabled, Fernwood works fine — sessions just don't accumulate long
 
 ---
 
-## Discord (Optional)
+## Chat Apps
 
-Fernwood keeps PicoClaw's Discord channel. To enable:
+For exampe add a Discord channel. To enable:
 
 ```json
 {
@@ -176,7 +176,7 @@ Then run `./build/fernwood gateway`.
 fernwood onboard          Initialize config and workspace
 fernwood agent            Interactive session
 fernwood agent -m "..."   Single-task mode
-fernwood gateway          Start Discord gateway
+fernwood gateway          Start gateway
 fernwood status           Show current status
 ```
 
