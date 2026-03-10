@@ -1,20 +1,20 @@
 services:
   # ─────────────────────────────────────────────
   # PicoClaw Agent (one-shot query) - Full MCP Support
-  #   docker compose -f docker/docker-compose.full.yml run --rm picoclaw-agent -m "Hello"
+  #   docker compose -f docker/docker-compose.full.yml run --rm fernwood-agent -m "Hello"
   # ─────────────────────────────────────────────
-  picoclaw-agent:
+  fernwood-agent:
     build:
       context: ..
       dockerfile: docker/Dockerfile.full
-    container_name: picoclaw-agent-full
+    container_name: fernwood-agent-full
     profiles:
       - agent
     volumes:
-      - ../config/config.json:/root/.picoclaw/config.json:ro
-      - picoclaw-workspace:/root/.picoclaw/workspace
-      - picoclaw-npm-cache:/root/.npm # npm cache for faster MCP server installs
-    entrypoint: ["picoclaw", "agent"]
+      - ../config/config.json:/root/.fernwood/config.json:ro
+      - fernwood-workspace:/root/.fernwood/workspace
+      - fernwood-npm-cache:/root/.npm # npm cache for faster MCP server installs
+    entrypoint: ["fernwood", "agent"]
     stdin_open: true
     tty: true
 
@@ -22,23 +22,23 @@ services:
   # PicoClaw Gateway (Long-running Bot) - Full MCP Support
   #   docker compose -f docker/docker-compose.full.yml --profile gateway up
   # ─────────────────────────────────────────────
-  picoclaw-gateway:
+  fernwood-gateway:
     build:
       context: ..
       dockerfile: docker/Dockerfile.full
-    container_name: picoclaw-gateway-full
+    container_name: fernwood-gateway-full
     restart: unless-stopped
     profiles:
       - gateway
     volumes:
       # Configuration file
-      - ../config/config.json:/root/.picoclaw/config.json:ro
+      - ../config/config.json:/root/.fernwood/config.json:ro
       # Persistent workspace (sessions, memory, logs)
-      - picoclaw-workspace:/root/.picoclaw/workspace
+      - fernwood-workspace:/root/.fernwood/workspace
       # NPM cache for faster MCP server installs
-      - picoclaw-npm-cache:/root/.npm
+      - fernwood-npm-cache:/root/.npm
     command: ["gateway"]
 
 volumes:
-  picoclaw-workspace:
-  picoclaw-npm-cache: # Cache npm packages to speed up MCP server installations
+  fernwood-workspace:
+  fernwood-npm-cache: # Cache npm packages to speed up MCP server installations
