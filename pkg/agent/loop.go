@@ -26,6 +26,7 @@ import (
 	"github.com/strand1/fernwood/pkg/logger"
 	"github.com/strand1/fernwood/pkg/mcp"
 	"github.com/strand1/fernwood/pkg/media"
+	"github.com/strand1/fernwood/pkg/memory"
 	"github.com/strand1/fernwood/pkg/providers"
 	"github.com/strand1/fernwood/pkg/routing"
 	"github.com/strand1/fernwood/pkg/skills"
@@ -41,6 +42,7 @@ type AgentLoop struct {
 	state          *state.Manager
 	running        atomic.Bool
 	summarizing    sync.Map
+	recording      sync.Map
 	fallback       *providers.FallbackChain
 	channelManager *channels.Manager
 	mediaStore     media.MediaStore
@@ -97,6 +99,7 @@ func NewAgentLoop(
 		registry:    registry,
 		state:       stateManager,
 		summarizing: sync.Map{},
+		recording:   sync.Map{},
 		fallback:    fallbackChain,
 		cmdRegistry: commands.NewRegistry(commands.BuiltinDefinitions()),
 	}
@@ -738,6 +741,15 @@ func (al *AgentLoop) runAgentLoop(
 			"final_length": len(finalContent),
 		})
 
+	// 9. Auto-record learnings if mulch auto_record is enabled
+	if al.cfg.Mulch.AutoRecord {
+		go func() {
+			recCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			al.autoRecordLearnings(recCtx, agent, opts.SessionKey)
+		}()
+	}
+
 	return finalContent, nil
 }
 
@@ -1247,6 +1259,111 @@ func (al *AgentLoop) maybeSummarize(agent *AgentInstance, sessionKey, channel, c
 			}()
 		}
 	}
+}
+
+// autoRecordLearnings extracts learnings from the conversation and records them to mulch
+// if auto_record is enabled. It runs in a goroutine and is non-blocking.
+func (al *AgentLoop) autoRecordLearnings(ctx context.Context, agent *AgentInstance, sessionKey string) {
+	// Deduplication: avoid concurrent recordings for the same session
+	key := agent.ID + ":" + sessionKey
+	if _, loading := al.recording.LoadOrStore(key, true); loading {
+		return
+	}
+	defer al.recording.Delete(key)
+
+	mulchMgr := agent.ContextBuilder.mulch
+	if mulchMgr == nil || !mulchMgr.Enabled {
+		return
+	}
+
+	history := agent.Sessions.GetHistory(sessionKey)
+	if len(history) < 2 {
+		return
+	}
+
+	// Limit history size to keep prompt reasonable
+	const maxMessages = 20
+	if len(history) > maxMessages {
+		history = history[len(history)-maxMessages:]
+	}
+
+	// Build prompt to extract learnings
+	var sb strings.Builder
+	sb.WriteString("Analyze this conversation and extract learnings to remember for future similar tasks.\n\n")
+	sb.WriteString("Categories:\n")
+	sb.WriteString("- errors: problems encountered and how they were fixed\n")
+	sb.WriteString("- decisions: important choices made about approach, architecture, or tools\n")
+	sb.WriteString("- code: coding patterns, conventions, useful references, or how-to guidance\n\n")
+	sb.WriteString("For each learning, output a JSON object with: domain (\"errors\", \"decisions\", or \"code\"), type (one of: \"failure\", \"decision\", \"convention\", \"pattern\", \"reference\", \"guide\"), and content (brief but informative text).\n")
+	sb.WriteString("Return a JSON array of learning objects. If none, return [].\n\n")
+	sb.WriteString("Conversation:\n")
+
+	for _, msg := range history {
+		role := msg.Role
+		if role == "tool" {
+			role = "tool_result"
+		}
+		content := msg.Content
+		if len(content) > 2000 {
+			content = content[:2000] + "..."
+		}
+		fmt.Fprintf(&sb, "%s: %s\n\n", role, content)
+	}
+
+	prompt := sb.String()
+
+	// Use background context with timeout
+	recCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Call LLM to extract learnings
+	resp, err := agent.Provider.Chat(recCtx, []providers.Message{{Role: "user", Content: prompt}}, nil, agent.Model, map[string]any{
+		"max_tokens":       2000,
+		"temperature":      0.3,
+		"prompt_cache_key": agent.ID + ":mulch",
+	})
+	if err != nil || resp.Content == "" {
+		logger.DebugCF("agent", "Mulch auto-record: LLM call failed or empty", map[string]any{"error": err})
+		return
+	}
+
+	raw := strings.TrimSpace(resp.Content)
+	// Strip markdown code fences if present
+	if strings.HasPrefix(raw, "```") {
+		parts := strings.SplitN(raw, "\n", 2)
+		if len(parts) >= 2 {
+			raw = strings.TrimSpace(parts[1])
+			if strings.HasSuffix(raw, "```") {
+				raw = strings.TrimSuffix(raw, "```")
+			}
+		}
+	}
+
+	var records []memory.MulchRecord
+	if err := json.Unmarshal([]byte(raw), &records); err != nil {
+		logger.DebugCF("agent", "Mulch auto-record: JSON parse error", map[string]any{"error": err, "raw": raw})
+		return
+	}
+
+	// Filter valid records
+	valid := make([]memory.MulchRecord, 0, len(records))
+	for _, r := range records {
+		r.Domain = strings.TrimSpace(r.Domain)
+		r.Type = strings.TrimSpace(r.Type)
+		r.Content = strings.TrimSpace(r.Content)
+		if r.Domain != "" && r.Type != "" && r.Content != "" {
+			valid = append(valid, r)
+		}
+	}
+
+	if len(valid) == 0 {
+		logger.DebugCF("agent", "Mulch auto-record: no valid learnings extracted", nil)
+		return
+	}
+
+	// Record to mulch
+	mulchMgr.RecordBatch(valid)
+	logger.InfoCF("agent", "Mulch auto-record: recorded learnings", map[string]any{"count": len(valid)})
 }
 
 // forceCompression aggressively reduces context when the limit is hit.
