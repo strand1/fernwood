@@ -52,7 +52,7 @@ func getGlobalConfigDir() string {
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(home, ".picoclaw")
+	return filepath.Join(home, ".fernwood")
 }
 
 func NewContextBuilder(workspace string, cfg *config.Config) *ContextBuilder {

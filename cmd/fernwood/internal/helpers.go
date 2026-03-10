@@ -18,9 +18,9 @@ var (
 	goVersion string
 )
 
-// GetPicoclawHome returns the picoclaw home directory.
-// Priority: $FERNWOOD_HOME > ~/.picoclaw
-func GetPicoclawHome() string {
+// GetFernwoodHome returns the fernwood home directory.
+// Priority: $FERNWOOD_HOME > ~/.fernwood
+func GetFernwoodHome() string {
 	if home := os.Getenv("FERNWOOD_HOME"); home != "" {
 		return home
 	}
@@ -32,7 +32,7 @@ func GetConfigPath() string {
 	if configPath := os.Getenv("FERNWOOD_CONFIG"); configPath != "" {
 		return configPath
 	}
-	return filepath.Join(GetPicoclawHome(), "config.json")
+	return filepath.Join(GetFernwoodHome(), "config.json")
 }
 
 func LoadConfig() (*config.Config, error) {

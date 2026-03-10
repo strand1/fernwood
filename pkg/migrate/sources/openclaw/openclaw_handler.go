@@ -91,7 +91,7 @@ func (o *OpenclawHandler) ExecuteConfigMigration(srcConfigPath, dstConfigPath st
 		return err
 	}
 
-	picoCfg, warnings, err := openclawCfg.ConvertToPicoClaw(o.opts.SourceHome)
+	picoCfg, warnings, err := openclawCfg.ConvertToFernwood(o.opts.SourceHome)
 	if err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func findSourceConfig(sourceHome string) (string, error) {
 }
 
 func rewriteWorkspacePath(path string) string {
-	path = strings.Replace(path, ".openclaw", ".picoclaw", 1)
+	path = strings.Replace(path, ".openclaw", ".fernwood", 1)
 	return path
 }
 

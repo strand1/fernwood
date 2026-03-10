@@ -1,7 +1,7 @@
-// PicoClaw - Ultra-lightweight personal AI agent
+// Fernwood - A lightweight agentic coding harness forked from PicoClaw
 // License: MIT
 //
-// Copyright (c) 2026 PicoClaw contributors
+// Copyright (c) 2026 Fernwood contributors
 
 package config
 
@@ -10,13 +10,13 @@ import (
 	"path/filepath"
 )
 
-// DefaultConfig returns the default configuration for PicoClaw.
+// DefaultConfig returns the default configuration for Fernwood.
 func DefaultConfig() *Config {
 	// Determine the base path for the workspace.
 	// Priority: $FERNWOOD_HOME > ~/.fernwood
 	var homePath string
-	if picoclawHome := os.Getenv("FERNWOOD_HOME"); picoclawHome != "" {
-		homePath = picoclawHome
+	if fernwoodHome := os.Getenv("FERNWOOD_HOME"); fernwoodHome != "" {
+		homePath = fernwoodHome
 	} else {
 		userHome, _ := os.UserHomeDir()
 		homePath = filepath.Join(userHome, ".fernwood")

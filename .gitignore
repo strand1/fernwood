@@ -8,13 +8,13 @@ build/
 *.dylib
 *.test
 *.out
-/picoclaw
-/picoclaw-test
+/fernwood
+/fernwood-test
 
 # Picoclaw specific
 
 # PicoClaw
-.picoclaw/
+.fernwood/
 config.json
 sessions/
 build/

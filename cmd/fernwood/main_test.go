@@ -11,14 +11,14 @@ import (
 	"github.com/strand1/fernwood/cmd/fernwood/internal"
 )
 
-func TestNewPicoclawCommand(t *testing.T) {
-	cmd := NewPicoclawCommand()
+func TestNewFernwoodCommand(t *testing.T) {
+	cmd := NewFernwoodCommand()
 
 	require.NotNil(t, cmd)
 
-	short := fmt.Sprintf("%s picoclaw - Personal AI Assistant v%s\n\n", internal.Logo, internal.GetVersion())
+	short := fmt.Sprintf("%s fernwood - Personal AI Assistant v%s\n\n", internal.Logo, internal.GetVersion())
 
-	assert.Equal(t, "picoclaw", cmd.Use)
+	assert.Equal(t, "fernwood", cmd.Use)
 	assert.Equal(t, short, cmd.Short)
 
 	assert.True(t, cmd.HasSubCommands())

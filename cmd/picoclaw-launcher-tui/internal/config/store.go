@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	configDirName  = ".picoclaw"
+	configDirName  = ".fernwood"
 	configFileName = "config.json"
 )
 

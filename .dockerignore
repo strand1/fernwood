@@ -1,7 +1,7 @@
 .git
 .gitignore
 build/
-.picoclaw/
+.fernwood/
 config/
 .env
 .env.example

@@ -13,11 +13,11 @@ func NewMigrateCommand() *cobra.Command {
 		Use:   "migrate",
 		Short: "Migrate from xxxclaw(openclaw, etc.) to fernwood",
 		Args:  cobra.NoArgs,
-		Example: `  picoclaw migrate
-  picoclaw migrate --from openclaw
-  picoclaw migrate --dry-run
-  picoclaw migrate --refresh
-  picoclaw migrate --force`,
+		Example: `  fernwood migrate
+  fernwood migrate --from openclaw
+  fernwood migrate --dry-run
+  fernwood migrate --refresh
+  fernwood migrate --force`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			m := migrate.NewMigrateInstance(opts)
 			result, err := m.Run(opts)
@@ -46,7 +46,7 @@ func NewMigrateCommand() *cobra.Command {
 	cmd.Flags().StringVar(&opts.SourceHome, "source-home", "",
 		"Override source home directory (default: ~/.openclaw)")
 	cmd.Flags().StringVar(&opts.TargetHome, "target-home", "",
-		"Override target home directory (default: ~/.picoclaw)")
+		"Override target home directory (default: ~/.fernwood)")
 
 	return cmd
 }

@@ -1,7 +1,7 @@
-// PicoClaw - Ultra-lightweight personal AI agent
+// Fernwood - A lightweight agentic coding harness forked from PicoClaw
 // License: MIT
 //
-// Copyright (c) 2026 PicoClaw contributors
+// Copyright (c) 2026 Fernwood contributors
 
 package config
 
@@ -186,7 +186,7 @@ func TestFullConfig_JSON_BackwardCompat(t *testing.T) {
 	oldFormat := `{
 		"agents": {
 			"defaults": {
-				"workspace": "~/.picoclaw/workspace",
+				"workspace": "~/.fernwood/workspace",
 				"model": "gpt4",
 				"max_tokens": 4096
 			}
@@ -203,7 +203,7 @@ func TestFullConfig_JSON_BackwardCompat(t *testing.T) {
 	newFormat := `{
 		"agents": {
 			"defaults": {
-				"workspace": "~/.picoclaw/workspace",
+				"workspace": "~/.fernwood/workspace",
 				"model_name": "gpt4",
 				"max_tokens": 4096
 			}
@@ -212,7 +212,7 @@ func TestFullConfig_JSON_BackwardCompat(t *testing.T) {
 			{
 				"model_name": "gpt4",
 				"model": "openai/gpt-4o",
-				"api_key": "test-key"
+				api_key": "test-key"
 			}
 		]
 	}`

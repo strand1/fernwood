@@ -1,7 +1,7 @@
-// PicoClaw - Ultra-lightweight personal AI agent
+// Fernwood - A lightweight agentic coding harness forked from PicoClaw
 // License: MIT
 //
-// Copyright (c) 2026 PicoClaw contributors
+// Copyright (c) 2026 Fernwood contributors
 
 package providers
 
