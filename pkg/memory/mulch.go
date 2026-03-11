@@ -134,12 +134,23 @@ func (m *MulchManager) ListDomains() ([]string, error) {
 		if line == "" {
 			continue
 		}
-		// Assuming format: "domain_name status..."
-		// Extract first word as domain name
-		parts := strings.Fields(line)
-		if len(parts) > 0 {
-			domains = append(domains, parts[0])
+		// Only consider lines that look like domain entries: "<name>: <N> records"
+		// Skip headers, separators (===), empty lines, etc.
+		if !strings.Contains(line, " records") {
+			continue
 		}
+		// Extract the part before the colon, then trim space and any trailing colon
+		idx := strings.IndexByte(line, ':')
+		if idx <= 0 {
+			continue
+		}
+		name := strings.TrimSpace(line[:idx])
+		// Remove trailing colon if present (defensive)
+		name = strings.TrimSuffix(name, ":")
+		if name == "" {
+			continue
+		}
+		domains = append(domains, name)
 	}
 	return domains, nil
 }
