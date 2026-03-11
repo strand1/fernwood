@@ -73,12 +73,16 @@ func NewContextBuilder(workspace string, cfg *config.Config) *ContextBuilder {
 	}
 	_ = mulchMgr.Init() // Safe to ignore error; Prime() will return empty if not initialized
 
-	return &ContextBuilder{
+	cb := &ContextBuilder{
 		workspace:    workspace,
 		skillsLoader: skills.NewSkillsLoader(workspace, globalSkillsDir, builtinSkillsDir),
 		memory:       NewMemoryStore(workspace),
 		mulch:        mulchMgr,
 	}
+	// Eagerly build and cache the system prompt at startup
+	cb.BuildSystemPromptWithCache()
+
+	return cb
 }
 
 func (cb *ContextBuilder) getIdentity() string {
