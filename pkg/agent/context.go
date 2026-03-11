@@ -167,10 +167,20 @@ The following skills extend your capabilities. To use a skill, read its SKILL.md
 	// Mulch usage instructions (always present if mulch is enabled)
 	if cb.mulch.Enabled {
 		parts = append(parts, `## Mulch Expertise System
+You have access to a growing knowledge base organized by domain.
+Available domains are listed below as a compact index.
 
-Use the mulch_query tool to retrieve full expertise for a domain when relevant.
-Record learnings: mulch record <domain> --type <type> --description "..."
-Before session end: mulch sync to commit changes.`)
+Use mulch_query to retrieve full expertise for a domain when a relevant topic comes up.
+Use mulch_record to record anything worth keeping permanently:
+  - Conventions (project patterns, coding standards)
+  - Patterns (reusable solutions, named approaches)
+  - Failures (errors hit and how they were resolved)
+  - Decisions (why X was chosen over Y)
+  - References (useful tools, links, resources)
+  - Guides (how-to knowledge)
+
+Be proactive: if you learn something useful during a conversation, record it.
+New domains can be created freely as topics emerge — don't force everything into existing domains.`)
 	}
 
 	// Join with "---" separator

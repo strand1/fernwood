@@ -461,10 +461,11 @@ type DevicesConfig struct {
 }
 
 type MulchConfig struct {
-	Enabled    bool     `json:"enabled"    env:"MULCH_ENABLED"`
-	BinPath    string   `json:"bin"        env:"MULCH_BIN"`
-	AutoRecord bool     `json:"auto_record" env:"MULCH_AUTO_RECORD"`
-	Domains    []string `json:"domains"`
+	Enabled      bool     `json:"enabled"    env:"MULCH_ENABLED"`
+	BinPath      string   `json:"bin"        env:"MULCH_BIN"`
+	AutoRecord   bool     `json:"auto_record" env:"MULCH_AUTO_RECORD"`
+	ReflectOnClear bool   `json:"reflect_on_clear" env:"MULCH_REFLECT_ON_CLEAR"`
+	Domains      []string `json:"domains"`
 }
 
 type ProvidersConfig struct {

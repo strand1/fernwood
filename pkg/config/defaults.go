@@ -493,5 +493,12 @@ func DefaultConfig() *Config {
 			Enabled:    false,
 			MonitorUSB: true,
 		},
+		Mulch: MulchConfig{
+			Enabled:        false,
+			AutoRecord:     false,
+			ReflectOnClear: true,
+			Domains:        []string{"code", "errors", "decisions"},
+			BinPath:        "mulch",
+		},
 	}
 }

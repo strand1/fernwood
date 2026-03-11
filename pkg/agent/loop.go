@@ -43,7 +43,6 @@ type AgentLoop struct {
 	state          *state.Manager
 	running        atomic.Bool
 	summarizing    sync.Map
-	recording      sync.Map
 	fallback       *providers.FallbackChain
 	channelManager *channels.Manager
 	mediaStore     media.MediaStore
@@ -100,7 +99,6 @@ func NewAgentLoop(
 		registry:    registry,
 		state:       stateManager,
 		summarizing: sync.Map{},
-		recording:   sync.Map{},
 		fallback:    fallbackChain,
 		cmdRegistry: commands.NewRegistry(commands.BuiltinDefinitions()),
 	}
@@ -230,6 +228,7 @@ func registerSharedTools(
 		// Mulch query tool for on-demand expertise retrieval
 		if agent.ContextBuilder.mulch.Enabled {
 			agent.Tools.Register(tools.NewMulchQueryTool(agent.ContextBuilder.mulch))
+			agent.Tools.Register(tools.NewMulchRecordTool(agent.ContextBuilder.mulch))
 		}
 	}
 }
@@ -747,15 +746,6 @@ func (al *AgentLoop) runAgentLoop(
 			"final_length": len(finalContent),
 		})
 
-	// 9. Auto-record learnings if mulch auto_record is enabled
-	if al.cfg.Mulch.AutoRecord {
-		go func() {
-			recCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			al.autoRecordLearnings(recCtx, agent, opts.SessionKey)
-		}()
-	}
-
 	return finalContent, nil
 }
 
@@ -1251,125 +1241,135 @@ func (al *AgentLoop) selectCandidates(
 
 // maybeSummarize triggers summarization if the session history exceeds thresholds.
 func (al *AgentLoop) maybeSummarize(agent *AgentInstance, sessionKey, channel, chatID string) {
-	newHistory := agent.Sessions.GetHistory(sessionKey)
-	tokenEstimate := al.estimateTokens(newHistory)
+	history := agent.Sessions.GetHistory(sessionKey)
+	tokenEstimate := al.estimateTokens(history)
 	threshold := agent.ContextWindow * agent.SummarizeTokenPercent / 100
 
-	if len(newHistory) > agent.SummarizeMessageThreshold || tokenEstimate > threshold {
+	if len(history) > agent.SummarizeMessageThreshold || tokenEstimate > threshold {
 		summarizeKey := agent.ID + ":" + sessionKey
 		if _, loading := al.summarizing.LoadOrStore(summarizeKey, true); !loading {
 			go func() {
 				defer al.summarizing.Delete(summarizeKey)
 				logger.Debug("Memory threshold reached. Optimizing conversation history...")
+
+				// Reflect on messages that will be dropped by summarization (all but last 4)
+				if len(history) > 4 {
+					oldMsgs := history[:len(history)-4]
+					if len(oldMsgs) > 0 {
+						ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+						n, err := al.runReflectionLoop(ctx, agent, oldMsgs)
+						if err != nil {
+							log.Printf("[mulch] Reflection error during compaction: %v", err)
+						} else if n > 0 {
+							log.Printf("[mulch] pre-compaction reflection: %d learnings recorded", n)
+						}
+						cancel()
+					}
+				}
+
 				al.summarizeSession(agent, sessionKey)
 			}()
 		}
 	}
 }
 
-// autoRecordLearnings extracts learnings from the conversation and records them to mulch
-// if auto_record is enabled. It runs in a goroutine and is non-blocking.
-func (al *AgentLoop) autoRecordLearnings(ctx context.Context, agent *AgentInstance, sessionKey string) {
-	// Deduplication: avoid concurrent recordings for the same session
-	key := agent.ID + ":" + sessionKey
-	if _, loading := al.recording.LoadOrStore(key, true); loading {
-		return
-	}
-	defer al.recording.Delete(key)
 
-	mulchMgr := agent.ContextBuilder.mulch
-	if mulchMgr == nil || !mulchMgr.Enabled {
-		return
-	}
 
-	history := agent.Sessions.GetHistory(sessionKey)
-	if len(history) < 2 {
-		return
-	}
+// runReflectionLoop runs a mini agent loop to record learnings from the provided messages.
+// It returns the number of successful mulch_record calls made.
+func (al *AgentLoop) runReflectionLoop(ctx context.Context, agent *AgentInstance, history []providers.Message) (int, error) {
+	systemPrompt := agent.ContextBuilder.BuildSystemPromptWithCache()
+	systemMsg := providers.Message{Role: "system", Content: systemPrompt}
 
-	// Limit history size to keep prompt reasonable
-	const maxMessages = 20
-	if len(history) > maxMessages {
-		history = history[len(history)-maxMessages:]
-	}
+	reflectionPrompt := `Review this conversation and identify anything worth recording as permanent project knowledge using the mulch_record tool. Consider:
+- Any errors encountered and how they were resolved (failures)
+- Any decisions made and why (decisions)
+- Any patterns or conventions that emerged (patterns/conventions)
+- Any useful tools or resources referenced (references)
+- Any new topic areas that warrant a new domain
 
-	// Build prompt to extract learnings
-	var sb strings.Builder
-	sb.WriteString("Analyze this conversation and extract learnings to remember for future similar tasks.\n\n")
-	sb.WriteString("Categories:\n")
-	sb.WriteString("- errors: problems encountered and how they were fixed\n")
-	sb.WriteString("- decisions: important choices made about approach, architecture, or tools\n")
-	sb.WriteString("- code: coding patterns, conventions, useful references, or how-to guidance\n\n")
-	sb.WriteString("For each learning, output a JSON object with: domain (\"errors\", \"decisions\", or \"code\"), type (one of: \"failure\", \"decision\", \"convention\", \"pattern\", \"reference\", \"guide\"), and content (brief but informative text).\n")
-	sb.WriteString("Return a JSON array of learning objects. If none, return [].\n\n")
-	sb.WriteString("Conversation:\n")
+Create new domains freely if needed. Record each learning via mulch_record.
+When finished recording, respond with exactly: REFLECTION_DONE`
+	userMsg := providers.Message{Role: "user", Content: reflectionPrompt}
 
-	for _, msg := range history {
-		role := msg.Role
-		if role == "tool" {
-			role = "tool_result"
+	messages := []providers.Message{systemMsg}
+	messages = append(messages, history...)
+	messages = append(messages, userMsg)
+
+	// Only allow mulch_record and mulch_query tools during reflection.
+	toolNames := []string{"mulch_record", "mulch_query"}
+	toolDefs := make([]providers.ToolDefinition, 0, len(toolNames))
+	for _, name := range toolNames {
+		tool, ok := agent.Tools.Get(name)
+		if !ok {
+			return 0, fmt.Errorf("tool %s not available during reflection", name)
 		}
-		content := msg.Content
-		if len(content) > 2000 {
-			content = content[:2000] + "..."
+		toolDefs = append(toolDefs, providers.ToolDefinition{
+			Type: "function",
+			Function: providers.ToolFunctionDefinition{
+				Name:        tool.Name(),
+				Description: tool.Description(),
+				Parameters:  tool.Parameters(),
+			},
+		})
+	}
+
+	recordCount := 0
+	maxIter := 10
+	for i := 0; i < maxIter; i++ {
+		resp, err := agent.Provider.Chat(ctx, messages, toolDefs, agent.Model, map[string]any{
+			"max_tokens":       agent.MaxTokens,
+			"temperature":      0.3,
+			"prompt_cache_key": agent.ID + ":reflection",
+		})
+		if err != nil {
+			return recordCount, fmt.Errorf("LLM call failed: %w", err)
 		}
-		fmt.Fprintf(&sb, "%s: %s\n\n", role, content)
-	}
 
-	prompt := sb.String()
+		// Append assistant message
+		assistantMsg := providers.Message{
+			Role:    "assistant",
+			Content: resp.Content,
+		}
+		for _, tc := range resp.ToolCalls {
+			norm := providers.NormalizeToolCall(tc)
+			argsJSON, _ := json.Marshal(norm.Arguments)
+			assistantMsg.ToolCalls = append(assistantMsg.ToolCalls, providers.ToolCall{
+				ID:   norm.ID,
+				Type: "function",
+				Name: norm.Name,
+				Function: &providers.FunctionCall{
+					Name:      norm.Name,
+					Arguments: string(argsJSON),
+				},
+			})
+		}
+		messages = append(messages, assistantMsg)
 
-	// Use background context with timeout
-	recCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+		// Check for completion: no tool calls and REFLECTION_DONE in content
+		if len(resp.ToolCalls) == 0 && strings.Contains(resp.Content, "REFLECTION_DONE") {
+			return recordCount, nil
+		}
 
-	// Call LLM to extract learnings
-	resp, err := agent.Provider.Chat(recCtx, []providers.Message{{Role: "user", Content: prompt}}, nil, agent.Model, map[string]any{
-		"max_tokens":       2000,
-		"temperature":      0.3,
-		"prompt_cache_key": agent.ID + ":mulch",
-	})
-	if err != nil || resp.Content == "" {
-		log.Printf("[mulch] auto-record: LLM call failed: %v", err)
-		return
-	}
+		// Execute tool calls
+		for _, tc := range resp.ToolCalls {
+			norm := providers.NormalizeToolCall(tc)
+			result := agent.Tools.Execute(ctx, norm.Name, norm.Arguments)
+			toolMsg := providers.Message{
+				Role:       "tool",
+				Content:    result.ForLLM,
+				ToolCallID: norm.ID,
+			}
+			messages = append(messages, toolMsg)
 
-	raw := strings.TrimSpace(resp.Content)
-	// Strip markdown code fences if present
-	if strings.HasPrefix(raw, "```") {
-		parts := strings.SplitN(raw, "\n", 2)
-		if len(parts) >= 2 {
-			raw = strings.TrimSpace(parts[1])
-			if strings.HasSuffix(raw, "```") {
-				raw = strings.TrimSuffix(raw, "```")
+			// Count successful mulch_record calls
+			if norm.Name == "mulch_record" && !result.IsError {
+				recordCount++
 			}
 		}
 	}
 
-	var records []memory.MulchRecord
-	if err := json.Unmarshal([]byte(raw), &records); err != nil {
-		log.Printf("[mulch] auto-record: JSON parse error: %v raw: %s", err, raw)
-		return
-	}
-
-	// Filter valid records
-	valid := make([]memory.MulchRecord, 0, len(records))
-	for _, r := range records {
-		r.Domain = strings.TrimSpace(r.Domain)
-		r.Type = strings.TrimSpace(r.Type)
-		r.Content = strings.TrimSpace(r.Content)
-		if r.Domain != "" && r.Type != "" && r.Content != "" {
-			valid = append(valid, r)
-		}
-	}
-
-	if len(valid) == 0 {
-		log.Printf("[mulch] auto-record: no valid learnings extracted")
-		return
-	}
-
-	// Record to mulch
-	mulchMgr.RecordBatch(valid)
-	logger.InfoCF("agent", "Mulch auto-record: recorded learnings", map[string]any{"count": len(valid)})
+	return recordCount, fmt.Errorf("reflection exceeded %d iterations", maxIter)
 }
 
 // forceCompression aggressively reduces context when the limit is hit.
@@ -1828,12 +1828,32 @@ func (al *AgentLoop) buildCommandsRuntime(agent *AgentInstance, opts *processOpt
 				return fmt.Errorf("required components not initialized")
 			}
 
+			// Get session history before deletion for reflection
+			history := agent.Sessions.GetHistory(opts.SessionKey)
+
 			// Send initial message
 			al.bus.PublishOutbound(context.Background(), bus.OutboundMessage{
 				Channel: opts.Channel,
 				ChatID:  opts.ChatID,
 				Content: "Clearing context and refreshing summaries...",
 			})
+
+			// Reflect on session before clearing, if enabled and we have sufficient history
+			if al.cfg.Mulch.ReflectOnClear && agent.Provider != nil && len(history) > 2 {
+				al.bus.PublishOutbound(context.Background(), bus.OutboundMessage{
+					Channel: opts.Channel,
+					ChatID:  opts.ChatID,
+					Content: "Reflecting on session before clearing...",
+				})
+				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+				n, err := al.runReflectionLoop(ctx, agent, history)
+				if err != nil {
+					log.Printf("[mulch] Reflection error during /clear: %v", err)
+				} else if n > 0 {
+					log.Printf("[mulch] /clear reflection: %d learnings recorded", n)
+				}
+				cancel()
+			}
 
 			// Delete session file and in-memory session
 			if err := agent.Sessions.Delete(opts.SessionKey); err != nil {
@@ -1852,30 +1872,19 @@ func (al *AgentLoop) buildCommandsRuntime(agent *AgentInstance, opts *processOpt
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 				defer cancel()
 				summarizer := memory.NewProviderSummarizer(agent.Provider, agent.Model)
-				refreshed, skipped, err := mulchMgr.SummarizeDomains(ctx, summarizer)
+				_, _, err := mulchMgr.SummarizeDomains(ctx, summarizer)
 				if err != nil {
 					log.Printf("[mulch] SummarizeDomains error during /clear: %v", err)
-					// Still continue to rebuild prompt
-					al.bus.PublishOutbound(context.Background(), bus.OutboundMessage{
-						Channel: opts.Channel,
-						ChatID:  opts.ChatID,
-						Content: fmt.Sprintf("Summarization error: %v. Context cleared, %d refreshed, %d skipped (partial).", err, len(refreshed), len(skipped)),
-					})
-				} else {
-					log.Printf("[mulch] Clear summary refresh: %d refreshed, %d skipped", len(refreshed), len(skipped))
-					al.bus.PublishOutbound(context.Background(), bus.OutboundMessage{
-						Channel: opts.Channel,
-						ChatID:  opts.ChatID,
-						Content: fmt.Sprintf("Done. Context cleared, %d domains refreshed, %d skipped.", len(refreshed), len(skipped)),
-					})
 				}
-			} else {
-				al.bus.PublishOutbound(context.Background(), bus.OutboundMessage{
-					Channel: opts.Channel,
-					ChatID:  opts.ChatID,
-					Content: "Done. Context cleared.",
-				})
+				// Note: not sending count to user per spec, just log
 			}
+
+			// Send final confirmation
+			al.bus.PublishOutbound(context.Background(), bus.OutboundMessage{
+				Channel: opts.Channel,
+				ChatID:  opts.ChatID,
+				Content: "Done. Context cleared.",
+			})
 
 			// Invalidate cache and rebuild system prompt to pick up fresh summaries
 			agent.ContextBuilder.InvalidateCache()

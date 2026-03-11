@@ -40,6 +40,9 @@ tasks/
 # Plans
 docs/plans/
 
+# Specs
+spec-*.md
+
 # Editors
 .vscode/
 .idea/
