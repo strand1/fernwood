@@ -1329,7 +1329,7 @@ func (al *AgentLoop) autoRecordLearnings(ctx context.Context, agent *AgentInstan
 		"prompt_cache_key": agent.ID + ":mulch",
 	})
 	if err != nil || resp.Content == "" {
-		logger.DebugCF("agent", "Mulch auto-record: LLM call failed or empty", map[string]any{"error": err})
+		log.Printf("[mulch] auto-record: LLM call failed: %v", err)
 		return
 	}
 
@@ -1347,7 +1347,7 @@ func (al *AgentLoop) autoRecordLearnings(ctx context.Context, agent *AgentInstan
 
 	var records []memory.MulchRecord
 	if err := json.Unmarshal([]byte(raw), &records); err != nil {
-		logger.DebugCF("agent", "Mulch auto-record: JSON parse error", map[string]any{"error": err, "raw": raw})
+		log.Printf("[mulch] auto-record: JSON parse error: %v raw: %s", err, raw)
 		return
 	}
 
@@ -1363,7 +1363,7 @@ func (al *AgentLoop) autoRecordLearnings(ctx context.Context, agent *AgentInstan
 	}
 
 	if len(valid) == 0 {
-		logger.DebugCF("agent", "Mulch auto-record: no valid learnings extracted", nil)
+		log.Printf("[mulch] auto-record: no valid learnings extracted")
 		return
 	}
 

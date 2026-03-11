@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/strand1/fernwood/pkg/config"
-	"github.com/strand1/fernwood/pkg/logger"
 	"github.com/strand1/fernwood/pkg/memory"
 	"github.com/strand1/fernwood/pkg/providers"
 	"github.com/strand1/fernwood/pkg/routing"
@@ -254,10 +253,10 @@ func (ai *AgentInstance) init() {
 			summarizer := memory.NewProviderSummarizer(ai.Provider, ai.Model)
 			refreshed, skipped, err := ai.ContextBuilder.mulch.SummarizeDomains(ctx, summarizer)
 			if err != nil {
-				logger.DebugCF("agent", "Background summarization failed", map[string]any{"error": err})
+				log.Printf("[mulch] Background summarization failed: %v", err)
 				return
 			}
-			logger.DebugCF("agent", "Domain summarization on startup", map[string]any{"refreshed": len(refreshed), "skipped": len(skipped)})
+			log.Printf("[mulch] Domain summarization on startup: %d refreshed, %d skipped", len(refreshed), len(skipped))
 			// Invalidate and rebuild to pick up fresh summaries
 			ai.ContextBuilder.InvalidateCache()
 			ai.ContextBuilder.BuildSystemPromptWithCache()
