@@ -280,3 +280,25 @@ func (sm *SessionManager) SetHistory(key string, history []providers.Message) {
 		session.Updated = time.Now()
 	}
 }
+
+// Delete removes a session from memory and deletes its persistent file.
+// It holds the manager lock during the filesystem operation to prevent
+// a new session with the same key from being created between map deletion
+// and file removal. Non-existent files are ignored.
+func (sm *SessionManager) Delete(key string) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
+	delete(sm.sessions, key)
+	if sm.storage == "" {
+		return nil
+	}
+	filename := sanitizeFilename(key) + ".json"
+	path := filepath.Join(sm.storage, filename)
+
+	// Attempt to remove; ignore if file does not exist.
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}

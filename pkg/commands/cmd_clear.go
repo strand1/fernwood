@@ -12,9 +12,9 @@ func clearCommand() Definition {
 				return req.Reply(unavailableMsg)
 			}
 			if err := rt.ClearHistory(); err != nil {
-				return req.Reply("Failed to clear chat history: " + err.Error())
+				return req.Reply("Failed to clear context: " + err.Error())
 			}
-			return req.Reply("Chat history cleared!")
+			return req.Reply("Context cleared.")
 		},
 	}
 }

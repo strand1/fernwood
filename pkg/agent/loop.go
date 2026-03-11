@@ -1806,13 +1806,19 @@ func (al *AgentLoop) buildCommandsRuntime(agent *AgentInstance, opts *processOpt
 			if opts == nil {
 				return fmt.Errorf("process options not available")
 			}
-			if agent.Sessions == nil {
-				return fmt.Errorf("sessions not initialized for agent")
+			if agent == nil || agent.Sessions == nil || agent.ContextBuilder == nil {
+				return fmt.Errorf("required components not initialized")
 			}
 
-			agent.Sessions.SetHistory(opts.SessionKey, make([]providers.Message, 0))
-			agent.Sessions.SetSummary(opts.SessionKey, "")
-			agent.Sessions.Save(opts.SessionKey)
+			// Delete the session file and in-memory session
+			if err := agent.Sessions.Delete(opts.SessionKey); err != nil {
+				return fmt.Errorf("failed to delete session: %w", err)
+			}
+
+			// Invalidate context builder cache and rebuild system prompt with fresh mulch prime
+			agent.ContextBuilder.InvalidateCache()
+			agent.ContextBuilder.BuildSystemPromptWithCache()
+
 			return nil
 		}
 	}
