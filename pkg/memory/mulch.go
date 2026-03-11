@@ -171,9 +171,9 @@ func (m *MulchManager) summaryPath(domain string) string {
 // domainDataPath returns the path to the domain JSONL data file.
 func (m *MulchManager) domainDataPath(domain string) string {
 	if m.WorkingDir != "" {
-		return filepath.Join(m.WorkingDir, ".mulch", "domains", domain+".jsonl")
+		return filepath.Join(m.WorkingDir, ".mulch", "expertise", domain+".jsonl")
 	}
-	return filepath.Join(".mulch", "domains", domain+".jsonl")
+	return filepath.Join(".mulch", "expertise", domain+".jsonl")
 }
 
 // IsSummaryStale checks if the summary for a domain needs refreshing.
