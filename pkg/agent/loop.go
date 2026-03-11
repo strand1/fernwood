@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -1853,7 +1854,7 @@ func (al *AgentLoop) buildCommandsRuntime(agent *AgentInstance, opts *processOpt
 				summarizer := memory.NewProviderSummarizer(agent.Provider, agent.Model)
 				refreshed, skipped, err := mulchMgr.SummarizeDomains(ctx, summarizer)
 				if err != nil {
-					logger.DebugCF("agent", "SummarizeDomains error", map[string]any{"error": err})
+					log.Printf("[mulch] SummarizeDomains error during /clear: %v", err)
 					// Still continue to rebuild prompt
 					al.bus.PublishOutbound(context.Background(), bus.OutboundMessage{
 						Channel: opts.Channel,
@@ -1861,7 +1862,7 @@ func (al *AgentLoop) buildCommandsRuntime(agent *AgentInstance, opts *processOpt
 						Content: fmt.Sprintf("Summarization error: %v. Context cleared, %d refreshed, %d skipped (partial).", err, len(refreshed), len(skipped)),
 					})
 				} else {
-					logger.DebugCF("agent", "Clear summary refresh", map[string]any{"refreshed": len(refreshed), "skipped": len(skipped)})
+					log.Printf("[mulch] Clear summary refresh: %d refreshed, %d skipped", len(refreshed), len(skipped))
 					al.bus.PublishOutbound(context.Background(), bus.OutboundMessage{
 						Channel: opts.Channel,
 						ChatID:  opts.ChatID,
