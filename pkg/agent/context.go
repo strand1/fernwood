@@ -56,6 +56,17 @@ func getGlobalConfigDir() string {
 }
 
 func NewContextBuilder(workspace string, cfg *config.Config) *ContextBuilder {
+	// If cfg is nil, create a minimal default config
+	if cfg == nil {
+		cfg = &config.Config{
+			Mulch: config.MulchConfig{
+				Enabled: false,
+				BinPath: "mulch",
+				Domains: []string{"code", "errors", "decisions"},
+			},
+		}
+	}
+
 	// builtin skills: skills directory in current project
 	// Use the skills/ directory under the current working directory
 	builtinSkillsDir := strings.TrimSpace(os.Getenv("FERNWOOD_BUILTIN_SKILLS"))
@@ -147,10 +158,19 @@ The following skills extend your capabilities. To use a skill, read its SKILL.md
 		parts = append(parts, "# Memory\n\n"+memoryContext)
 	}
 
-	// Expertise from Mulch (persistent learnings)
-	expertise := cb.mulch.Prime()
-	if expertise != "" {
-		parts = append(parts, "# Project Expertise (from previous sessions)\n\n"+expertise)
+	// Expertise index from Mulch summaries (lazy-load domain content on demand)
+	expertiseIndex := cb.mulch.LoadDomainIndex()
+	if expertiseIndex != "" {
+		parts = append(parts, "# Expertise Domains (index)\n\n"+expertiseIndex)
+	}
+
+	// Mulch usage instructions (always present if mulch is enabled)
+	if cb.mulch.Enabled {
+		parts = append(parts, `## Mulch Expertise System
+
+Use the mulch_query tool to retrieve full expertise for a domain when relevant.
+Record learnings: mulch record <domain> --type <type> --description "..."
+Before session end: mulch sync to commit changes.`)
 	}
 
 	// Join with "---" separator

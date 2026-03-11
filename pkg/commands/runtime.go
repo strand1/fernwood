@@ -1,6 +1,10 @@
 package commands
 
-import "github.com/strand1/fernwood/pkg/config"
+import (
+	"github.com/strand1/fernwood/pkg/config"
+	"github.com/strand1/fernwood/pkg/memory"
+	"github.com/strand1/fernwood/pkg/providers"
+)
 
 // Runtime provides runtime dependencies to command handlers. It is constructed
 // per-request by the agent loop so that per-request state (like session scope)
@@ -14,4 +18,6 @@ type Runtime struct {
 	SwitchModel        func(value string) (oldModel string, err error)
 	SwitchChannel      func(value string) error
 	ClearHistory       func() error
+	GetMulchManager    func() *memory.MulchManager
+	GetLLMProvider     func() providers.LLMProvider
 }

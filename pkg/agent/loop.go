@@ -225,6 +225,11 @@ func registerSharedTools(
 				logger.WarnCF("agent", "spawn tool requires subagent to be enabled", nil)
 			}
 		}
+
+		// Mulch query tool for on-demand expertise retrieval
+		if agent.ContextBuilder.mulch.Enabled {
+			agent.Tools.Register(tools.NewMulchQueryTool(agent.ContextBuilder.mulch))
+		}
 	}
 }
 
@@ -1801,6 +1806,18 @@ func (al *AgentLoop) buildCommandsRuntime(agent *AgentInstance, opts *processOpt
 			agent.Model = value
 			return oldModel, nil
 		}
+		rt.GetMulchManager = func() *memory.MulchManager {
+			if agent != nil && agent.ContextBuilder != nil {
+				return agent.ContextBuilder.mulch
+			}
+			return nil
+		}
+		rt.GetLLMProvider = func() providers.LLMProvider {
+			if agent != nil {
+				return agent.Provider
+			}
+			return nil
+		}
 
 		rt.ClearHistory = func() error {
 			if opts == nil {
@@ -1810,12 +1827,56 @@ func (al *AgentLoop) buildCommandsRuntime(agent *AgentInstance, opts *processOpt
 				return fmt.Errorf("required components not initialized")
 			}
 
-			// Delete the session file and in-memory session
+			// Send initial message
+			al.bus.PublishOutbound(context.Background(), bus.OutboundMessage{
+				Channel: opts.Channel,
+				ChatID:  opts.ChatID,
+				Content: "Clearing context and refreshing summaries...",
+			})
+
+			// Delete session file and in-memory session
 			if err := agent.Sessions.Delete(opts.SessionKey); err != nil {
-				return fmt.Errorf("failed to delete session: %w", err)
+				errMsg := fmt.Sprintf("failed to delete session: %v", err)
+				al.bus.PublishOutbound(context.Background(), bus.OutboundMessage{
+					Channel: opts.Channel,
+					ChatID:  opts.ChatID,
+					Content: "Error: " + errMsg,
+				})
+				return errors.New(errMsg)
 			}
 
-			// Invalidate context builder cache and rebuild system prompt with fresh mulch prime
+			// Refresh mulch summaries synchronously if mulch is enabled
+			mulchMgr := agent.ContextBuilder.mulch
+			if mulchMgr != nil && mulchMgr.Enabled && agent.Provider != nil {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+				defer cancel()
+				summarizer := memory.NewProviderSummarizer(agent.Provider, agent.Model)
+				refreshed, skipped, err := mulchMgr.SummarizeDomains(ctx, summarizer)
+				if err != nil {
+					logger.DebugCF("agent", "SummarizeDomains error", map[string]any{"error": err})
+					// Still continue to rebuild prompt
+					al.bus.PublishOutbound(context.Background(), bus.OutboundMessage{
+						Channel: opts.Channel,
+						ChatID:  opts.ChatID,
+						Content: fmt.Sprintf("Summarization error: %v. Context cleared, %d refreshed, %d skipped (partial).", err, len(refreshed), len(skipped)),
+					})
+				} else {
+					logger.DebugCF("agent", "Clear summary refresh", map[string]any{"refreshed": len(refreshed), "skipped": len(skipped)})
+					al.bus.PublishOutbound(context.Background(), bus.OutboundMessage{
+						Channel: opts.Channel,
+						ChatID:  opts.ChatID,
+						Content: fmt.Sprintf("Done. Context cleared, %d domains refreshed, %d skipped.", len(refreshed), len(skipped)),
+					})
+				}
+			} else {
+				al.bus.PublishOutbound(context.Background(), bus.OutboundMessage{
+					Channel: opts.Channel,
+					ChatID:  opts.ChatID,
+					Content: "Done. Context cleared.",
+				})
+			}
+
+			// Invalidate cache and rebuild system prompt to pick up fresh summaries
 			agent.ContextBuilder.InvalidateCache()
 			agent.ContextBuilder.BuildSystemPromptWithCache()
 

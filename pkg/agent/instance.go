@@ -1,14 +1,18 @@
 package agent
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/strand1/fernwood/pkg/config"
+	"github.com/strand1/fernwood/pkg/logger"
+	"github.com/strand1/fernwood/pkg/memory"
 	"github.com/strand1/fernwood/pkg/providers"
 	"github.com/strand1/fernwood/pkg/routing"
 	"github.com/strand1/fernwood/pkg/session"
@@ -213,7 +217,7 @@ func NewAgentInstance(
 		}
 	}
 
-	return &AgentInstance{
+	agent := &AgentInstance{
 		ID:                        agentID,
 		Name:                      agentName,
 		Model:                     model,
@@ -235,6 +239,29 @@ func NewAgentInstance(
 		Candidates:                candidates,
 		Router:                    router,
 		LightCandidates:           lightCandidates,
+	}
+	agent.init()
+	return agent
+}
+
+// init starts background tasks after agent creation.
+func (ai *AgentInstance) init() {
+	// Non-blocking mulch domain summarization on startup if mulch is enabled
+	if ai.ContextBuilder.mulch.Enabled && ai.Provider != nil {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer cancel()
+			summarizer := memory.NewProviderSummarizer(ai.Provider, ai.Model)
+			refreshed, skipped, err := ai.ContextBuilder.mulch.SummarizeDomains(ctx, summarizer)
+			if err != nil {
+				logger.DebugCF("agent", "Background summarization failed", map[string]any{"error": err})
+				return
+			}
+			logger.DebugCF("agent", "Domain summarization on startup", map[string]any{"refreshed": len(refreshed), "skipped": len(skipped)})
+			// Invalidate and rebuild to pick up fresh summaries
+			ai.ContextBuilder.InvalidateCache()
+			ai.ContextBuilder.BuildSystemPromptWithCache()
+		}()
 	}
 }
 
