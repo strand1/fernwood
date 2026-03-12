@@ -64,3 +64,4 @@ web/backend/dist/*
 # But exclude sensitive data if needed
 !.mulch/
 !.seeds/
+AGENTS.md
