@@ -197,20 +197,15 @@ func (sl *SkillsLoader) BuildSkillsSummary() string {
 	}
 
 	var lines []string
-	lines = append(lines, "<skills>")
+	lines = append(lines, "```skills")
 	for _, s := range allSkills {
-		escapedName := escapeXML(s.Name)
-		escapedDesc := escapeXML(s.Description)
-		escapedPath := escapeXML(s.Path)
-
-		lines = append(lines, fmt.Sprintf("  <skill>"))
-		lines = append(lines, fmt.Sprintf("    <name>%s</name>", escapedName))
-		lines = append(lines, fmt.Sprintf("    <description>%s</description>", escapedDesc))
-		lines = append(lines, fmt.Sprintf("    <location>%s</location>", escapedPath))
-		lines = append(lines, fmt.Sprintf("    <source>%s</source>", s.Source))
-		lines = append(lines, "  </skill>")
+		lines = append(lines, fmt.Sprintf("Skill: %s", s.Name))
+		lines = append(lines, fmt.Sprintf("  Description: %s", s.Description))
+		lines = append(lines, fmt.Sprintf("  Location: %s", s.Path))
+		lines = append(lines, fmt.Sprintf("  Source: %s", s.Source))
+		lines = append(lines, "") // blank line between skills
 	}
-	lines = append(lines, "</skills>")
+	lines = append(lines, "```")
 
 	return strings.Join(lines, "\n")
 }
