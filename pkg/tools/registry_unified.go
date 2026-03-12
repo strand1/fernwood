@@ -38,6 +38,15 @@ func NewCommandRegistry() *CommandRegistry {
 	return r
 }
 
+// NewCommandRegistryWithFS creates a new command registry with file system commands.
+// workspace: base directory for relative paths
+// restrict: if true, restrict all operations to workspace
+func NewCommandRegistryWithFS(workspace string, restrict bool) *CommandRegistry {
+	r := NewCommandRegistry()
+	RegisterFSCommands(r, workspace, restrict)
+	return r
+}
+
 // Register adds a command to the registry.
 // name: command name (e.g., "ls", "cat", "memory")
 // description: help text shown in "help" output

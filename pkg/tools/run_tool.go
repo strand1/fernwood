@@ -23,7 +23,7 @@ type RunTool struct {
 // NewRunTool creates a new run tool with the given workspace and restrictions.
 func NewRunTool(workspace string, restrict bool) *RunTool {
 	return &RunTool{
-		registry:          NewCommandRegistry(),
+		registry:          NewCommandRegistryWithFS(workspace, restrict),
 		workspace:         workspace,
 		restrictToWorkspace: restrict,
 	}
