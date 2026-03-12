@@ -64,37 +64,20 @@ func NewAgentInstance(
 	fallbacks := resolveAgentFallbacks(agentCfg, defaults)
 
 	restrict := defaults.RestrictToWorkspace
-	readRestrict := restrict && !defaults.AllowReadOutsideWorkspace
 
 	// Compile path whitelist patterns from config.
-	allowReadPaths := compilePatterns(cfg.Tools.AllowReadPaths)
 	allowWritePaths := compilePatterns(cfg.Tools.AllowWritePaths)
 
 	toolsRegistry := tools.NewToolRegistry()
 
-	if cfg.Tools.IsToolEnabled("read_file") {
-		toolsRegistry.Register(tools.NewReadFileTool(workspace, readRestrict, allowReadPaths))
-	}
-	if cfg.Tools.IsToolEnabled("write_file") {
-		toolsRegistry.Register(tools.NewWriteFileTool(workspace, restrict, allowWritePaths))
-	}
-	if cfg.Tools.IsToolEnabled("list_dir") {
-		toolsRegistry.Register(tools.NewListDirTool(workspace, readRestrict, allowReadPaths))
-	}
-	if cfg.Tools.IsToolEnabled("exec") {
-		execTool, err := tools.NewExecToolWithConfig(workspace, restrict, cfg)
-		if err != nil {
-			log.Fatalf("Critical error: unable to initialize exec tool: %v", err)
-		}
-		toolsRegistry.Register(execTool)
-	}
-	if cfg.Tools.IsToolEnabled("bash") {
-		bashTool, err := tools.NewBashToolWithConfig(workspace, restrict, cfg)
-		if err == nil {
-			toolsRegistry.Register(bashTool)
-		}
+	// Unified run tool replaces read_file, write_file, list_dir, bash, exec, mulch_*
+	if cfg.Tools.IsToolEnabled("run") {
+		sessionsDir := filepath.Join(workspace, "sessions")
+		runTool := tools.NewRunTool(workspace, sessionsDir, restrict)
+		toolsRegistry.Register(runTool)
 	}
 
+	// Keep edit_file and append_file for complex surgical edits
 	if cfg.Tools.IsToolEnabled("edit_file") {
 		toolsRegistry.Register(tools.NewEditFileTool(workspace, restrict, allowWritePaths))
 	}

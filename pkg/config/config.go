@@ -677,6 +677,7 @@ type ToolsConfig struct {
 	Web             WebToolsConfig     `json:"web"`
 	Cron            CronToolsConfig    `json:"cron"`
 	Exec            ExecConfig         `json:"exec"`
+	Run             ToolConfig         `json:"run"                                                        envPrefix:"FERNWOOD_TOOLS_RUN_"`
 	Bash            ToolConfig         `json:"bash"                                                  envPrefix:"FERNWOOD_TOOLS_BASH_"`
 	Skills          SkillsToolsConfig  `json:"skills"`
 	MediaCleanup    MediaCleanupConfig `json:"media_cleanup"`

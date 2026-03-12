@@ -225,11 +225,9 @@ func registerSharedTools(
 			}
 		}
 
-		// Mulch query tool for on-demand expertise retrieval
-		if agent.ContextBuilder.mulch.Enabled {
-			agent.Tools.Register(tools.NewMulchQueryTool(agent.ContextBuilder.mulch))
-			agent.Tools.Register(tools.NewMulchRecordTool(agent.ContextBuilder.mulch, agent.Provider, agent.Model))
-		}
+		// Mulch integration is now via run tool's memory commands:
+		// - memory store/record/facts/search/query/forget/status
+		// No separate tool registrations needed
 	}
 }
 
