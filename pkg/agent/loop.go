@@ -1252,58 +1252,22 @@ func (al *AgentLoop) maybeSummarize(agent *AgentInstance, sessionKey, channel, c
 				defer al.summarizing.Delete(summarizeKey)
 				logger.Debug("Memory threshold reached. Optimizing conversation history...")
 
-				cfg := al.cfg
-				if cfg.Context.Enabled {
-					// Run the new context pipeline
-					result := runContextPipeline(history, agent, &cfg.Context)
-
-					// Pass A: resolution arc sweep (synchronous)
-					if len(result.ArcOps) > 0 && cfg.Mulch.Enabled && cfg.Mulch.ReflectOnClear {
-						arcMsgs := extractMessages(history, result.ArcOps)
-						ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
-						n, err := al.runReflectionLoop(ctx, agent, arcMsgs)
-						cancel()
+				// Reflect on messages that will be dropped by summarization (all but last 4)
+				if len(history) > 4 {
+					oldMsgs := history[:len(history)-4]
+					if len(oldMsgs) > 0 {
+						ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+						n, err := al.runReflectionLoop(ctx, agent, oldMsgs)
 						if err != nil {
-							log.Printf("[mulch] arc reflection error: %v", err)
+							log.Printf("[mulch] Reflection error during compaction: %v", err)
 						} else if n > 0 {
-							log.Printf("[mulch] resolution arc reflection: %d learnings recorded from %d operations", n, len(result.ArcOps))
+							log.Printf("[mulch] pre-compaction reflection: %d learnings recorded", n)
 						}
+						cancel()
 					}
-
-					// Pass B: general compaction reflection (non-blocking)
-					if len(result.CompactOps) > 0 && cfg.Mulch.Enabled && cfg.Mulch.ReflectOnClear {
-						compactMsgs := extractMessages(history, result.CompactOps)
-						go func() {
-							ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-							defer cancel()
-							n, _ := al.runReflectionLoop(ctx, agent, compactMsgs)
-							if n > 0 {
-								log.Printf("[mulch] pre-compaction reflection: %d learnings recorded", n)
-							}
-						}()
-					}
-
-					// Replace history with pipeline output
-					agent.Sessions.SetHistory(sessionKey, result.Messages)
-					agent.Sessions.Save(sessionKey)
-
-				} else {
-					// Fallback: existing behavior exactly preserved
-					if len(history) > 4 {
-						oldMsgs := history[:len(history)-4]
-						if len(oldMsgs) > 0 {
-							ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-							n, err := al.runReflectionLoop(ctx, agent, oldMsgs)
-							if err != nil {
-								log.Printf("[mulch] Reflection error during compaction: %v", err)
-							} else if n > 0 {
-								log.Printf("[mulch] pre-compaction reflection: %d learnings recorded", n)
-							}
-							cancel()
-						}
-					}
-					al.summarizeSession(agent, sessionKey)
 				}
+
+				al.summarizeSession(agent, sessionKey)
 			}()
 		}
 	}

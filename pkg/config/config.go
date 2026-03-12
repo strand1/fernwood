@@ -59,7 +59,6 @@ type Config struct {
 	Heartbeat HeartbeatConfig `json:"heartbeat"`
 	Devices   DevicesConfig   `json:"devices"`
 	Mulch     MulchConfig     `json:"mulch"`
-	Context   ContextConfig   `json:"context,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for Config
@@ -467,16 +466,6 @@ type MulchConfig struct {
 	AutoRecord   bool     `json:"auto_record" env:"MULCH_AUTO_RECORD"`
 	ReflectOnClear bool   `json:"reflect_on_clear" env:"MULCH_REFLECT_ON_CLEAR"`
 	Domains      []string `json:"domains"`
-}
-
-type ContextConfig struct {
-	Enabled          bool    `json:"enabled"            env:"CTX_PIPELINE_ENABLED"`
-	SystemPromptPct  float64 `json:"system_prompt_pct"`  // default: 0.20
-	ActiveOpPct      float64 `json:"active_op_pct"`      // default: 0.30
-	HistoryPct       float64 `json:"history_pct"`        // default: 0.25
-	HeadroomPct      float64 `json:"headroom_pct"`       // default: 0.25
-	CompactThreshold float64 `json:"compact_threshold"`  // default: 0.30
-	PerOpCapPct      float64 `json:"per_op_cap_pct"`     // default: 0.15
 }
 
 type ProvidersConfig struct {
