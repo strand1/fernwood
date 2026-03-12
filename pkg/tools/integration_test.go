@@ -5,7 +5,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestMorrohsuIntegration(t *testing.T) {
@@ -23,8 +22,9 @@ func TestMorrohsuIntegration(t *testing.T) {
 	tmpfile.Close()
 	
 	// Test the run tool with registry
-	registry := InitializeRegistry()
-	runTool := NewRunTool(registry)
+	registry := NewCommandRegistry()
+	runTool := NewRunTool("/tmp", false)
+	runTool.SetRegistry(registry)
 	
 	ctx := context.Background()
 	
@@ -127,8 +127,9 @@ func TestBinaryGuardIntegration(t *testing.T) {
 	tmpfile.Close()
 	
 	// Test the run tool with registry
-	registry := InitializeRegistry()
-	runTool := NewRunTool(registry)
+	registry := NewCommandRegistry()
+	runTool := NewRunTool("/tmp", false)
+	runTool.SetRegistry(registry)
 	
 	ctx := context.Background()
 	
@@ -167,8 +168,9 @@ func TestOverflowProtection(t *testing.T) {
 	tmpfile.Close()
 	
 	// Test the run tool with registry
-	registry := InitializeRegistry()
-	runTool := NewRunTool(registry)
+	registry := NewCommandRegistry()
+	runTool := NewRunTool("/tmp", false)
+	runTool.SetRegistry(registry)
 	
 	ctx := context.Background()
 	
@@ -209,8 +211,9 @@ func TestCommandChaining(t *testing.T) {
 	tmpfile.Close()
 	
 	// Test the run tool with registry
-	registry := InitializeRegistry()
-	runTool := NewRunTool(registry)
+	registry := NewCommandRegistry()
+	runTool := NewRunTool("/tmp", false)
+	runTool.SetRegistry(registry)
 	
 	ctx := context.Background()
 	
