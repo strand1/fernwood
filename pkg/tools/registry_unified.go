@@ -47,6 +47,17 @@ func NewCommandRegistryWithFS(workspace string, restrict bool) *CommandRegistry 
 	return r
 }
 
+// NewCommandRegistryFull creates a new command registry with all commands (FS, memory, topic).
+// workspace: base directory for relative paths
+// restrict: if true, restrict all operations to workspace
+// sessionStorage: path to session storage directory
+func NewCommandRegistryFull(workspace, sessionStorage string, restrict bool) *CommandRegistry {
+	r := NewCommandRegistryWithFS(workspace, restrict)
+	RegisterMemoryCommands(r)
+	RegisterTopicCommands(r, sessionStorage)
+	return r
+}
+
 // Register adds a command to the registry.
 // name: command name (e.g., "ls", "cat", "memory")
 // description: help text shown in "help" output

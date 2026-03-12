@@ -23,7 +23,7 @@ func TestMorrohsuIntegration(t *testing.T) {
 	
 	// Test the run tool with registry
 	registry := NewCommandRegistry()
-	runTool := NewRunTool("/tmp", false)
+	runTool := NewRunTool("/tmp", "", false)
 	runTool.SetRegistry(registry)
 	
 	ctx := context.Background()
@@ -128,7 +128,7 @@ func TestBinaryGuardIntegration(t *testing.T) {
 	
 	// Test the run tool with registry
 	registry := NewCommandRegistry()
-	runTool := NewRunTool("/tmp", false)
+	runTool := NewRunTool("/tmp", "", false)
 	runTool.SetRegistry(registry)
 	
 	ctx := context.Background()
@@ -169,7 +169,7 @@ func TestOverflowProtection(t *testing.T) {
 	
 	// Test the run tool with registry
 	registry := NewCommandRegistry()
-	runTool := NewRunTool("/tmp", false)
+	runTool := NewRunTool("/tmp", "", false)
 	runTool.SetRegistry(registry)
 	
 	ctx := context.Background()
@@ -212,7 +212,7 @@ func TestCommandChaining(t *testing.T) {
 	
 	// Test the run tool with registry
 	registry := NewCommandRegistry()
-	runTool := NewRunTool("/tmp", false)
+	runTool := NewRunTool("/tmp", "", false)
 	runTool.SetRegistry(registry)
 	
 	ctx := context.Background()

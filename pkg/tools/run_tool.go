@@ -17,14 +17,16 @@ import (
 type RunTool struct {
 	registry          *CommandRegistry
 	workspace         string
+	sessionStorage    string
 	restrictToWorkspace bool
 }
 
 // NewRunTool creates a new run tool with the given workspace and restrictions.
-func NewRunTool(workspace string, restrict bool) *RunTool {
+func NewRunTool(workspace, sessionStorage string, restrict bool) *RunTool {
 	return &RunTool{
-		registry:          NewCommandRegistryWithFS(workspace, restrict),
+		registry:          NewCommandRegistryFull(workspace, sessionStorage, restrict),
 		workspace:         workspace,
+		sessionStorage:    sessionStorage,
 		restrictToWorkspace: restrict,
 	}
 }
