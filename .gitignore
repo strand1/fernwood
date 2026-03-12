@@ -62,8 +62,8 @@ web/backend/dist/*
 
 # Don't ignore Mulch - it's valuable shared knowledge
 # But exclude sensitive data if needed
-!.mulch/
 !.seeds/
 AGENTS.md
 TEST_FAILURES.md
 TODO.md
+.mulch/
