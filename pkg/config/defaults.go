@@ -500,5 +500,14 @@ func DefaultConfig() *Config {
 			Domains:        []string{"code", "errors", "decisions"},
 			BinPath:        "mulch",
 		},
+		Context: ContextConfig{
+			Enabled:          false,
+			SystemPromptPct:  0.20,
+			ActiveOpPct:      0.30,
+			HistoryPct:       0.25,
+			HeadroomPct:      0.25,
+			CompactThreshold: 0.30,
+			PerOpCapPct:      0.15,
+		},
 	}
 }

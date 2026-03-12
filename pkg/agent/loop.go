@@ -228,7 +228,7 @@ func registerSharedTools(
 		// Mulch query tool for on-demand expertise retrieval
 		if agent.ContextBuilder.mulch.Enabled {
 			agent.Tools.Register(tools.NewMulchQueryTool(agent.ContextBuilder.mulch))
-			agent.Tools.Register(tools.NewMulchRecordTool(agent.ContextBuilder.mulch))
+			agent.Tools.Register(tools.NewMulchRecordTool(agent.ContextBuilder.mulch, agent.Provider, agent.Model))
 		}
 	}
 }
@@ -1252,22 +1252,58 @@ func (al *AgentLoop) maybeSummarize(agent *AgentInstance, sessionKey, channel, c
 				defer al.summarizing.Delete(summarizeKey)
 				logger.Debug("Memory threshold reached. Optimizing conversation history...")
 
-				// Reflect on messages that will be dropped by summarization (all but last 4)
-				if len(history) > 4 {
-					oldMsgs := history[:len(history)-4]
-					if len(oldMsgs) > 0 {
-						ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-						n, err := al.runReflectionLoop(ctx, agent, oldMsgs)
-						if err != nil {
-							log.Printf("[mulch] Reflection error during compaction: %v", err)
-						} else if n > 0 {
-							log.Printf("[mulch] pre-compaction reflection: %d learnings recorded", n)
-						}
-						cancel()
-					}
-				}
+				cfg := al.cfg
+				if cfg.Context.Enabled {
+					// Run the new context pipeline
+					result := runContextPipeline(history, agent, &cfg.Context)
 
-				al.summarizeSession(agent, sessionKey)
+					// Pass A: resolution arc sweep (synchronous)
+					if len(result.ArcOps) > 0 && cfg.Mulch.Enabled && cfg.Mulch.ReflectOnClear {
+						arcMsgs := extractMessages(history, result.ArcOps)
+						ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+						n, err := al.runReflectionLoop(ctx, agent, arcMsgs)
+						cancel()
+						if err != nil {
+							log.Printf("[mulch] arc reflection error: %v", err)
+						} else if n > 0 {
+							log.Printf("[mulch] resolution arc reflection: %d learnings recorded from %d operations", n, len(result.ArcOps))
+						}
+					}
+
+					// Pass B: general compaction reflection (non-blocking)
+					if len(result.CompactOps) > 0 && cfg.Mulch.Enabled && cfg.Mulch.ReflectOnClear {
+						compactMsgs := extractMessages(history, result.CompactOps)
+						go func() {
+							ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+							defer cancel()
+							n, _ := al.runReflectionLoop(ctx, agent, compactMsgs)
+							if n > 0 {
+								log.Printf("[mulch] pre-compaction reflection: %d learnings recorded", n)
+							}
+						}()
+					}
+
+					// Replace history with pipeline output
+					agent.Sessions.SetHistory(sessionKey, result.Messages)
+					agent.Sessions.Save(sessionKey)
+
+				} else {
+					// Fallback: existing behavior exactly preserved
+					if len(history) > 4 {
+						oldMsgs := history[:len(history)-4]
+						if len(oldMsgs) > 0 {
+							ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+							n, err := al.runReflectionLoop(ctx, agent, oldMsgs)
+							if err != nil {
+								log.Printf("[mulch] Reflection error during compaction: %v", err)
+							} else if n > 0 {
+								log.Printf("[mulch] pre-compaction reflection: %d learnings recorded", n)
+							}
+							cancel()
+						}
+					}
+					al.summarizeSession(agent, sessionKey)
+				}
 			}()
 		}
 	}
@@ -1278,18 +1314,24 @@ func (al *AgentLoop) maybeSummarize(agent *AgentInstance, sessionKey, channel, c
 // runReflectionLoop runs a mini agent loop to record learnings from the provided messages.
 // It returns the number of successful mulch_record calls made.
 func (al *AgentLoop) runReflectionLoop(ctx context.Context, agent *AgentInstance, history []providers.Message) (int, error) {
-	systemPrompt := agent.ContextBuilder.BuildSystemPromptWithCache()
+	domainIndex := agent.ContextBuilder.mulch.LoadDomainIndex()
+	systemPrompt := fmt.Sprintf(`You are reviewing a conversation to extract permanent learnings into a knowledge base.
+
+Available domains:
+%s
+
+Use mulch_record to save anything worth keeping permanently:
+- Failures (errors encountered and how they were resolved)
+- Decisions (why specific choices were made)
+- Patterns/Conventions (reusable solutions, standards)
+- References (useful tools, resources, links)
+
+Use mulch_query if you need to check what's already recorded in a domain.
+Create new domains freely if the topic doesn't fit existing ones.
+When finished recording all learnings, respond with exactly: REFLECTION_DONE`, domainIndex)
 	systemMsg := providers.Message{Role: "system", Content: systemPrompt}
 
-	reflectionPrompt := `Review this conversation and identify anything worth recording as permanent project knowledge using the mulch_record tool. Consider:
-- Any errors encountered and how they were resolved (failures)
-- Any decisions made and why (decisions)
-- Any patterns or conventions that emerged (patterns/conventions)
-- Any useful tools or resources referenced (references)
-- Any new topic areas that warrant a new domain
-
-Create new domains freely if needed. Record each learning via mulch_record.
-When finished recording, respond with exactly: REFLECTION_DONE`
+	reflectionPrompt := "Review the conversation above and record all learnings. Respond with REFLECTION_DONE when done."
 	userMsg := providers.Message{Role: "user", Content: reflectionPrompt}
 
 	messages := []providers.Message{systemMsg}

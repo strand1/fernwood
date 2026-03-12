@@ -58,3 +58,8 @@ dist/
 !web/backend/dist/
 web/backend/dist/*
 !web/backend/dist/.gitkeep
+
+# Don't ignore Mulch - it's valuable shared knowledge
+# But exclude sensitive data if needed
+!.mulch/
+!.seeds/
