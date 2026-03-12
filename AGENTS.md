@@ -11,29 +11,57 @@ This file documents issues, tasks, and important information for agents working 
 - **Build system**: GNU Make with Go
 - **Primary language**: Go 1.26+
 
-## Mulch Integration
+## ⚠️ CRITICAL: MULCH WORKFLOW - READ THIS BEFORE DOING ANYTHING ⚠️
 
 This project uses **Mulch** (https://github.com/jayminwest/mulch) for codebase indexing, semantic search, and context management.
+
+### 🔴 STOP - DO NOT EDIT FILES MANUALLY
+
+DO NOT directly edit files in `.mulch/expertise/`. Doing so will break the schema validation and cause errors.
+
+DO NOT randomly add files to git. Respect `.gitignore` patterns.
+
+### ✅ CORRECT MULCH WORKFLOW (MANDATORY)
+
+1. **Load context first**: Run `mulch prime` to understand current project state
+2. **Search before implementing**: Run `mulch search "topic"` to avoid duplicating work
+3. **Record learnings properly**: Use `mulch record <domain> --type <type> --description "..."` 
+4. **Validate your changes**: Run `mulch validate` to check for schema errors
+5. **Sync to repository**: Run `mulch sync` to commit expertise changes
+
+### ⚠️ FAILURE MODES TO AVOID
+
+❌ DO NOT edit `.mulch/expertise/*.jsonl` files directly
+❌ DO NOT use random IDs like "mx-morrohsu-X" - let Mulch generate proper IDs
+❌ DO NOT skip `mulch validate` before committing
+❌ DO NOT add `.mulch/` files to git (they're intentionally gitignored)
 
 ### Installation
 
 Fernwood includes built-in skills for Mulch. The main Mulch integration is managed through:
 
-- `.mulch/` directory: Mulch configuration and data
+- `.mulch/` directory: Mulch configuration and data (GITIGNORED)
 - Skills: Workspace skills for Mulch operations
 
 ### Using Mulch
 
-When working on Fernwood, be aware that:
+When working on Fernwood, ALWAYS follow this process:
 
-1. **Mulch data** is stored in `.mulch/` (gitignored)
+1. **Mulch data** is stored in `.mulch/` (gitignored FOR GOOD REASON)
 2. Indexing is automatic on first run but can be triggered manually
 3. The `mulch-context` skill provides Mulch integration capabilities
+4. ALWAYS run `mulch prime` first to load project context
+5. ALWAYS run `mulch validate` after making changes
+6. ALWAYS run `mulch sync` to properly commit expertise
 
-### Mulch Versions
+### Critical Commands (USE THESE OR FACE CONSEQUENCES)
 
-- **Mulch Prime**: The latest stable version with all features
-- Use `mulch` or other variants as needed for specific use cases
+- `mulch --help` - Understand the tool first
+- `mulch prime` - Load all project context (RUN THIS FIRST)
+- `mulch search "query"` - Find existing knowledge
+- `mulch record <domain> --type <type> --description "content"` - Add new knowledge
+- `mulch validate` - Check for errors (RUN THIS BEFORE SYNC)
+- `mulch sync` - Commit expertise changes properly
 
 Refer to the Mulch documentation for advanced usage: https://github.com/jayminwest/mulch
 
@@ -102,6 +130,10 @@ make test
 4. **Git Hooks**: Pre-commit hooks may run linters and tests.
 5. **File Management**: Do not randomly add files to the repository. Pay attention to `.gitignore` patterns and respect intentionally untracked files/directories.
 6. **Mulch Data**: Files in `.mulch/` are gitignored for a reason - do not commit them unless explicitly required for sharing expertise contexts.
+7. **READ DOCUMENTATION FIRST**: Always read AGENTS.md and related documentation before making changes.
+8. **USE MULCH PROPERLY**: Never edit Mulch files directly. Always use `mulch record` and `mulch sync`.
+9. **CONTEXT LOADING**: Always run `mulch prime` before starting work to understand project context.
+10. **VALIDATION**: Always run `mulch validate` after making changes to catch errors early.
 
 ## Environment Variables
 
