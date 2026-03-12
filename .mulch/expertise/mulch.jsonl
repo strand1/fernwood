@@ -3,3 +3,4 @@
 {"type":"failure","description":"ListDomains() was parsing mulch status header lines as domain names","resolution":"Only parse lines containing 'records' substring, extract word before colon","classification":"tactical","recorded_at":"2026-03-11T16:44:55.104Z","id":"mx-f6f418"}
 {"type":"convention","content":"IsSummaryStale checks .mulch/expertise/<domain>.jsonl not .mulch/domains/ - correct path is expertise/","classification":"tactical","recorded_at":"2026-03-11T16:44:55.394Z","id":"mx-878bc6"}
 {"type":"convention","content":"Mulch records must be created using proper CLI commands to ensure correct schema compliance and ID generation","classification":"tactical","recorded_at":"2026-03-12T15:41:39.241Z","id":"mx-c8a384"}
+{"type":"convention","content":"Documentation must be explicit with warnings and mandatory steps to compensate for agent cognitive limitations","classification":"tactical","recorded_at":"2026-03-12T15:44:17.219Z","id":"mx-efdd09"}
