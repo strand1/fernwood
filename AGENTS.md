@@ -1,5 +1,7 @@
 # AGENTS.md
 
+🚨 **WARNING FOR AGENTS**: NEVER ADD UNTRACKED FILES TO GIT WITHOUT EXPLICIT PERMISSION! PAY ATTENTION TO .gitignore PATTERNS! 🚨
+
 This file documents issues, tasks, and important information for agents working on the Fernwood codebase.
 
 ## Project Overview
@@ -134,6 +136,7 @@ make test
 8. **USE MULCH PROPERLY**: Never edit Mulch files directly. Always use `mulch record` and `mulch sync`.
 9. **CONTEXT LOADING**: Always run `mulch prime` before starting work to understand project context.
 10. **VALIDATION**: Always run `mulch validate` after making changes to catch errors early.
+11. **GIT DISCIPLINE**: NEVER RUN `git add .` - ALWAYS CHECK `git status` FIRST - ONLY ADD FILES THAT SHOULD BE TRACKED!
 
 ## Environment Variables
 
