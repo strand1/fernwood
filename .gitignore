@@ -65,3 +65,5 @@ web/backend/dist/*
 !.mulch/
 !.seeds/
 AGENTS.md
+TEST_FAILURES.md
+TODO.md
