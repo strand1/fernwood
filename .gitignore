@@ -42,6 +42,7 @@ docs/plans/
 
 # Specs
 spec-*.md
+spec/
 
 # Editors
 .vscode/
