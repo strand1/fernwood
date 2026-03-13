@@ -2,11 +2,11 @@
   <img src="assets/fernwood_logo.png" alt="Fernwood" width="200"/>
 </p>
 
-<h1 align="center">Fernwood 🌲</h1>
+<h1 align="center">Fernwood</h1>
 
 <p align="center">
-  <strong>A focused coding agent for your terminal.</strong><br/>
-  Local-first. Single binary. Always learning via <a href="https://github.com/jayminwest/mulch">Mulch</a>.
+  <strong>Terminal-based coding agent.</strong><br/>
+  Forked from PicoClaw, with persistent memory.
 </p>
 
 <p align="center">
@@ -15,54 +15,44 @@
   <img src="https://img.shields.io/badge/status-production--ready-blue" alt="Production Ready"/>
 </p>
 
+<p align="center">
+  <em>"The creativity is in the constraint design, not the output generation."</em>
+</p>
+
 ---
 
-Fernwood is a lightweight agentic coding harness forked from [PicoClaw](https://github.com/sipeed/picoclaw). 
-It focuses on local software development workflows and provides a small set of core tools along with persistent memory across sessions.
+## What is Fernwood?
 
-**What's different from PicoClaw:**
-- Coding-focused toolset (`read_file`, `write_file`, `edit_file`, `bash`)
-- Agent identity and system prompt rewritten for software development
-- [Mulch](https://github.com/jayminwest/mulch) integration — proactive knowledge recording with session-end reflection
-- Dependencies halved (~53 vs ~106 direct deps)
-- **Always Be Learning**: Agent-driven expertise accumulation, not noisy auto-recording
+Fernwood is a lightweight AI coding harness that works directly in your codebase. Built on PicoClaw's agent loop, it adds Unix-style command execution and Mulch-powered persistent knowledge.
 
-**What's inherited from PicoClaw:**
-- Single self-contained Go binary
-- Fast startup, low memory footprint
-- Solid tool loop and agent orchestration
-- Chat apps
+**Core Philosophy:**
+- Coding-focused — Built specifically for software development workflows
+- Local-first — Runs on your machine, respects your workspace
+- Always learning — Proactively records knowledge via Mulch
+- Lightweight — Single binary, fast startup, low memory footprint
+- Unix-style — Command chaining, pipes, and shell auto-fallback
 
 ---
 
 ## Quick Start
 
-**1. Build**
+### 1. Initialize
 
 ```bash
-git clone https://github.com/strand1/fernwood.git
-cd fernwood
-make build
+./fernwood onboard
 ```
+This creates your workspace at `~/.fernwood/workspace` and generates a default config.
 
-**2. Initialize**
+### 2. Configure
 
-```bash
-./build/fernwood onboard
-```
-
-This creates `~/.fernwood/config.json` and the workspace at `~/.fernwood/workspace`.
-
-**3. Configure**
-
-Edit `~/.fernwood/config.json` and set your API key:
+Edit `~/.fernwood/config.json`:
 
 ```json
 {
   "agents": {
     "defaults": {
       "workspace": "~/.fernwood/workspace",
-      "model_name": "claude-sonnet-4-6",
+      "model_name": "claude-sonnet-4-5",
       "max_tokens": 8192,
       "temperature": 0.5,
       "max_tool_iterations": 30
@@ -70,166 +60,144 @@ Edit `~/.fernwood/config.json` and set your API key:
   },
   "model_list": [
     {
-      "model_name": "claude-sonnet-4-6",
-      "model": "anthropic/claude-sonnet-4-6",
+      "model_name": "claude-sonnet-4-5",
+      "model": "anthropic/claude-sonnet-4-5",
       "api_key": "YOUR_ANTHROPIC_API_KEY"
     }
   ]
 }
 ```
 
-Any OpenAI-compatible provider works. See `config/config.example.json` for the full schema.
-
-**4. Run**
+### 3. Run
 
 ```bash
-# Single task
-./build/fernwood agent -m "refactor the auth module to use interfaces"
+# Interactive session
+./fernwood agent
 
-# Interactive
-./build/fernwood agent
+# Single task
+./fernwood agent -m "refactor the auth module to use interfaces"
 ```
 
 ---
 
-## Tools
+## Mulch Setup (Optional)
 
-Fernwood gives the agent four tools:
+Fernwood integrates with [Mulch](https://github.com/jayminwest/mulch) for persistent memory across sessions. To enable:
 
-| Tool | Description |
-|------|-------------|
-| `read_file` | Read a file or list the project tree. Call with no args to see the tree. |
-| `write_file` | Create a new file. Use only for files that don't exist yet. |
-| `edit_file` | Surgically replace a string in an existing file. Fails loudly on ambiguous matches. |
-| `bash` | Run shell commands. Used for tests, builds, git operations. |
+**1. Install Mulch CLI**
 
-The agent is instructed to read before writing, make the smallest change that works, and run tests after any code change.
+```bash
+bun install -g @os-eco/mulch-cli
+```
 
----
+**2. Initialize Mulch in your workspace**
 
-## Mulch Memory — Always Be Learning
+```bash
+cd ~/.fernwood/workspace
+mulch init
+```
 
-Fernwood integrates with [Mulch](https://github.com/jayminwest/mulch) for persistent inter-session expertise. The agent proactively records knowledge during conversations and reflects before context is cleared.
+**3. Enable in config**
 
-**How it works:**
-
-1. **Proactive Recording**: Use the `mulch_record` tool during conversations to capture:
-   - **Conventions**: Project patterns, coding standards
-   - **Patterns**: Reusable solutions, named approaches
-   - **Failures**: Errors encountered and how they were resolved
-   - **Decisions**: Why X was chosen over Y
-   - **References**: Useful tools, links, resources
-   - **Guides**: How-to knowledge
-
-2. **Session-End Reflection**: Before `/clear` or memory compaction, Fernwood automatically reviews the conversation and records valuable learnings via `mulch_record`.
-
-3. **Dynamic Domains**: Create new domains freely as topics emerge — don't force everything into existing categories.
-
-Configure in `~/.fernwood/config.json`:
+Edit `~/.fernwood/config.json`:
 
 ```json
 {
   "mulch": {
     "enabled": true,
-    "bin": "mulch",
-    "reflect_on_clear": true,
-    "domains": ["code", "errors", "decisions"]
+    "bin": "mulch"
   }
 }
 ```
 
-| Config Option | Env Variable | Default | Description |
-|---------------|--------------|---------|-------------|
-| `enabled` | `MULCH_ENABLED` | `false` | Enable Mulch integration |
-| `bin` | `MULCH_BIN` | `"mulch"` | Path to mulch binary |
-| `reflect_on_clear` | `MULCH_REFLECT_ON_CLEAR` | `true` | Run reflection before clearing context |
-| `domains` | — | `[]` | Pre-configured domain names |
-
-With Mulch disabled, Fernwood works fine — sessions just don't accumulate long-term memory.
-
-**Example usage:**
-
-```bash
-# Agent records a failure resolution
-mulch_record(domain="build-system", type="failure", content="Go build failed with 'module not found'. Resolution: ran 'go mod tidy' to sync dependencies.")
-
-# Agent records a decision
-mulch_record(domain="architecture", type="decision", content="Chose interfaces over concrete types for auth module. Rationale: enables easier testing and provider swapping.")
-```
+Once enabled, Fernwood will automatically record knowledge during conversations and reflect before session clears.
 
 ---
 
-## Configuration
+## Tool Architecture
 
-| Environment Variable | Description | Default |
-|---------------------|-------------|---------|
-| `FERNWOOD_HOME` | Root directory for Fernwood data | `~/.fernwood` |
-| `FERNWOOD_CONFIG` | Path to config file | `$FERNWOOD_HOME/config.json` |
+Fernwood provides **3 core tools** plus optional integrations:
 
-**Workspace layout:**
+### Core Tools
 
-```
-~/.fernwood/workspace/
-├── memory/
-│   └── MEMORY.md       # Long-term memory
-├── sessions/           # Conversation history
-├── skills/             # Custom skill files
-└── AGENTS.md           # Agent behavior guide
-```
+| Tool | Purpose |
+|------|---------|
+| **`run`** | Unified command execution (primary tool) |
+| **`edit_file`** | Surgical file edits (preferred for code changes) |
+| **`append_file`** | Append content to files |
 
----
+### The `run` Tool
 
-## Chat Apps
+The `run` tool is your primary interface, supporting Unix-style command chaining (`|`, `&&`, `||`, `;`) and automatic shell fallback.
 
-For exampe add a Discord channel. To enable:
+**File operations:** `cat`, `ls`, `write`, `grep`, `head`, `tail`, `wc`, `stat`, `rm`, `cp`, `mv`, `mkdir`
 
-```json
-{
-  "channels": {
-    "discord": {
-      "enabled": true,
-      "token": "YOUR_BOT_TOKEN",
-      "allow_from": ["YOUR_USER_ID"]
-    }
-  }
-}
-```
+**Memory (Mulch):** `memory record`, `memory facts`, `memory search`, `memory query`, `memory forget`, `memory status`
 
-Then run `./build/fernwood gateway`.
+**Topic management:** `topic list`, `topic info`, `topic runs`, `topic run`, `topic rename`, `topic search`
 
----
+**Skills:** `skill search`, `skill install`, `skill list`, `skill info`, `skill update`, `skill uninstall`
 
-## CLI Reference
+**Shell auto-fallback:** Any unknown command executes via shell (`git`, `python3`, `sed`, etc.)
 
-```
-fernwood onboard          Initialize config and workspace
-fernwood agent            Interactive session
-fernwood agent -m "..."   Single-task mode
-fernwood gateway          Start gateway
-fernwood status           Show current status
-```
+*The `run` tool is based on [agent-clip](https://github.com/epiral/agent-clip).*
+
+### Optional Tools
+
+Enable via `~/.fernwood/config.json`:
+
+- **Web search** — Multiple search backends
+- **Web fetch** — Fetch and parse web pages
+- **Message** — Send messages to channels (Discord, Matrix)
+- **Send file** — Share files via channels
+- **Skills** — Discover and install skills from registries
+- **Subagent** — Spawn specialized agents for complex tasks
+- **MCP** — Model Context Protocol server integrations
 
 ---
 
-## Roadmap
+## Mulch Memory — Always Be Learning
 
-- [ ] Bubble Tea TUI — three-panel layout (agent log / tool calls / input)
-- [ ] Session persistence and `--resume`
-- [ ] `FERNWOOD_*` env var rename (currently inherits some `PICOCLAW_*` names)
-- [ ] Remove Antigravity OAuth code
-- [ ] `make release` with Linux + macOS binaries
-- [ ] Integrate [Sapling](https://github.com/jayminwest/sapling) for advanced memory management
+Fernwood integrates with [Mulch](https://github.com/jayminwest/mulch) for persistent inter-session expertise. Knowledge is organized by domain and grows over time.
+
+### How It Works
+
+1. **Proactive Recording** — Agent will record knowledge during conversations
+
+2. **Session-End Reflection** — Before `/clear`, Fernwood automatically reflects and records valuable learnings.
+
+3. **On-Demand Retrieval** — Domain summaries load at startup; full content retrieved via `memory query <domain>`, so when discussing a topic fernwood will remember key points.
+
+*Powered by [Mulch](https://github.com/jayminwest/mulch) — persistent expertise management.* 
+
+
+## Current Versions
+
+| Binary | Architecture | Size | Use Case |
+|--------|--------------|------|----------|
+| `fernwood-linux-amd64` | x86_64 | ~17MB | Desktop, server, cloud VMs |
+| `fernwood-linux-arm64` | ARM64 | ~16MB | Raspberry Pi, Apple Silicon, AWS Graviton |
 
 ---
 
 ## Credits
 
-Fernwood is a fork of [PicoClaw](https://github.com/sipeed/picoclaw) by [Sipeed](https://github.com/sipeed). The agent loop, tool infrastructure, provider routing, and Discord channel are substantially their work. PicoClaw is an impressive piece of engineering — Fernwood just points it at a different problem.
+**PicoClaw** — [sipeed/picoclaw](https://github.com/sipeed/picoclaw)  
+Fernwood is a fork of PicoClaw. The agent loop, base tool infrastructure, provider routing, and channel integrations are substantially their work.
 
-Mulch is by [Jaymin West](https://github.com/jayminwest).
+**Mulch** — [jayminwest/mulch](https://github.com/jayminwest/mulch)  
+Persistent expertise management and domain-based knowledge storage.
+
+**agent-clip** — [epiral/agent-clip](https://github.com/epiral/agent-clip)  
+The `run` tool's Unix-style command execution and chaining semantics.
 
 ---
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+---
+
+**Last Updated**: 2026-03-13  
+**Version**: Development (vdev)
