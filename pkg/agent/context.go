@@ -121,8 +121,15 @@ Execute Unix-style commands with chaining support (|, &&, ||, ;).
   • stat/rm/cp/mv/mkdir — File operations
 
 **Memory (Mulch):**
-  • memory store <domain> <content> — Record a fact
-  • memory record <domain> <type> <content> — Record with type (convention/pattern/failure/decision/reference/guide)
+  • memory store <domain> <content> — Record a fact (convention)
+  • memory record <domain> <type> [flags] <content> — Record with type
+    - convention: memory record <domain> convention <content>
+    - pattern: memory record <domain> pattern --name "X" --description "Y"
+    - failure: memory record <domain> failure --description "X" --resolution "Y"
+    - decision: memory record <domain> decision --title "X" --rationale "Y"
+    - reference: memory record <domain> reference --name "X" --description "Y"
+    - guide: memory record <domain> guide --name "X" --description "Y"
+    - JSON content also supported: memory record <domain> decision '{"title":"X","rationale":"Y"}'
   • memory facts <domain> — List records in domain
   • memory search <query> — Search across domains
   • memory query <domain> — Query domain (mulch prime)
@@ -140,8 +147,16 @@ Execute Unix-style commands with chaining support (|, &&, ||, ;).
 **Examples:**
   • run(command="cat main.go")
   • run(command="ls | grep .go && cat main.go")
-  • run(command='memory record go convention --description "Use context.WithTimeout"')
+  • run(command='memory record go convention "Use context.WithTimeout for external calls"')
+  • run(command='memory record agent-loop decision --title "Lazy Mulch Loading" --rationale "Performance over eager loading"')
+  • run(command='memory record testing failure --description "Test failed" --resolution "Added mock"')
   • run(command="topic list 5")
+  • run(command='skill search "github integration"')
+  • run(command='skill install sipeed/fernwood-skills/weather')
+  • run(command='skill list')
+  • run(command='sed -n "20,30p" main.go')  // Any shell command works (auto-fallback)
+  • run(command='grep -rn "TODO" . | head -5')  // Pipes, redirects all work
+  • run(command='python3 script.py --arg value')  // Shell auto-fallback for unknown commands
   • Use run(command="help") for full command list.
 
 ### edit_file — Surgical file edits
@@ -155,7 +170,11 @@ Add content to the end of a file.
 2. Use edit_file for code modifications (surgical, precise).
 3. Use run(command="write ...") only for new files.
 4. After code changes, run tests: run(command="go test ./...")
-5. Record learnings: run(command='memory record <domain> <type> --description "..."')
+5. Record learnings with proper flags per type:
+   - convention: run(command='memory record go convention "Use context.WithTimeout"')
+   - decision: run(command='memory record agent-loop decision --title "X" --rationale "Y"')
+   - failure: run(command='memory record testing failure --description "X" --resolution "Y"')
+   - pattern/reference/guide: run(command='memory record tools pattern --name "X" --description "Y"')
 6. If uncertain about scope, ask before acting.
 
 ## Memory
@@ -185,8 +204,23 @@ func (cb *ContextBuilder) BuildSystemPrompt() string {
 	if skillsSummary != "" {
 		parts = append(parts, fmt.Sprintf(`# Skills
 
-The following skills extend your capabilities. To use a skill, read its SKILL.md file using the read_file tool.
+Skills extend your capabilities with reusable instructions and tools.
 
+**Discover & Install:**
+- run(command='skill search <query>') — find skills by keyword
+- run(command='skill install <slug>') — install from registry
+- run(command='skill list') — list installed skills
+- run(command='skill info <name>') — view skill details
+
+**Manage:**
+- run(command='skill update <slug>') — update installed skill
+- run(command='skill uninstall <name>') — remove skill
+- run(command='skill enable/disable <name>') — toggle skill
+
+**Create:**
+- Write SKILL.md files in ~/.fernwood/workspace/skills/<name>/
+
+Installed skills:
 %s`, skillsSummary))
 	}
 
@@ -208,8 +242,8 @@ The following skills extend your capabilities. To use a skill, read its SKILL.md
 You have access to a growing knowledge base organized by domain.
 Available domains are listed below as a compact index.
 
-Use mulch_query to retrieve full expertise for a domain when a relevant topic comes up.
-Use mulch_record to record anything worth keeping permanently:
+Use run(command='memory query <domain>') to retrieve full expertise for a domain when a relevant topic comes up.
+Use run(command='memory record <domain> <type> <content>') to record anything worth keeping permanently:
   - Conventions (project patterns, coding standards)
   - Patterns (reusable solutions, named approaches)
   - Failures (errors hit and how they were resolved)

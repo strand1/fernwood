@@ -7,9 +7,13 @@ package tools
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
+	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,10 +26,23 @@ import (
 func RegisterFSCommands(registry *CommandRegistry, workspace string, restrict bool) {
 	// ls - List directory contents
 	registry.Register("ls", "List directory contents", func(args []string, stdin string) (string, error) {
+		// Check if any args look like flags (start with -)
+		hasFlags := false
 		path := "."
-		if len(args) > 0 {
-			path = args[0]
+		for i, arg := range args {
+			if strings.HasPrefix(arg, "-") {
+				hasFlags = true
+			} else if i == 0 || !strings.HasPrefix(args[i-1], "-") {
+				// First non-flag argument is the path
+				path = arg
+			}
 		}
+		
+		// If flags are present, use shell ls for full compatibility
+		if hasFlags {
+			return cmdShellLs(args, workspace, restrict)
+		}
+		
 		return cmdLs(path, workspace, restrict)
 	})
 
@@ -110,27 +127,86 @@ func RegisterFSCommands(registry *CommandRegistry, workspace string, restrict bo
 	registry.RegisterAlias("fs.mkdir", "mkdir")
 
 	// grep - Search text
-	registry.Register("grep", "Search text (grep [-i] [-v] [-c] <pattern> [file])", func(args []string, stdin string) (string, error) {
+	registry.Register("grep", "Search text (grep [-i] [-v] [-c] [-n] <pattern> [file])", func(args []string, stdin string) (string, error) {
 		return cmdGrep(args, stdin, workspace, restrict)
 	})
 
 	// head - First N lines
 	registry.Register("head", "First N lines (head [-n N] [file])", func(args []string, stdin string) (string, error) {
-		return cmdHead(args, stdin)
+		return cmdHead(args, stdin, workspace, restrict)
 	})
 
 	// tail - Last N lines
 	registry.Register("tail", "Last N lines (tail [-n N] [file])", func(args []string, stdin string) (string, error) {
-		return cmdTail(args, stdin)
+		return cmdTail(args, stdin, workspace, restrict)
 	})
 
 	// wc - Count lines/words/chars
 	registry.Register("wc", "Count lines/words/chars (wc [-l] [-w] [-c] [file])", func(args []string, stdin string) (string, error) {
-		return cmdWc(args, stdin)
+		return cmdWc(args, stdin, workspace, restrict)
+	})
+
+	// find - Find files (find [path] -name <pattern>)
+	registry.Register("find", "Find files (find [path] -name <pattern>)", func(args []string, stdin string) (string, error) {
+		return cmdFind(args, workspace, restrict)
+	})
+	registry.RegisterAlias("fs.find", "find")
+
+	// which - Find command in PATH
+	registry.Register("which", "Find command location in PATH", func(args []string, stdin string) (string, error) {
+		return cmdWhich(args)
+	})
+
+	// web_fetch - Fetch URL content
+	registry.Register("web_fetch", "Fetch URL content (web_fetch <url>)", func(args []string, stdin string) (string, error) {
+		return cmdWebFetch(args)
+	})
+
+	// sh - Execute shell command
+	registry.Register("sh", "Execute shell command (sh <command>)", func(args []string, stdin string) (string, error) {
+		return cmdSh(args, stdin)
+	})
+	registry.RegisterAlias("shell", "sh")
+	registry.RegisterAlias("bash", "sh")
+	registry.RegisterAlias("python", "sh")
+	registry.RegisterAlias("python3", "sh")
+
+	// sed - Stream editor
+	registry.Register("sed", "Stream editor (sed [-n] [-e script] [file])", func(args []string, stdin string) (string, error) {
+		return cmdSed(args, stdin, workspace, restrict)
 	})
 }
 
 // cmdLs implements the ls command
+// cmdShellLs executes the actual shell ls command with flags for full compatibility
+func cmdShellLs(args []string, workspace string, restrict bool) (string, error) {
+	// Build the command with proper argument handling
+	cmdArgs := append([]string{"ls"}, args...)
+	
+	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
+	cmd.Dir = workspace
+	
+	if restrict {
+		// Set up restricted environment
+		cmd.Env = append(os.Environ(),
+			"PWD="+workspace,
+		)
+	}
+	
+	output, err := cmd.CombinedOutput()
+	result := strings.TrimSpace(string(output))
+	
+	if err != nil {
+		// Include error output (ls often outputs errors to stderr)
+		if result != "" {
+			return result, nil // Return ls output even with non-zero exit
+		}
+		return "", fmt.Errorf("ls: %v", err)
+	}
+	
+	return result, nil
+}
+
 func cmdLs(path, workspace string, restrict bool) (string, error) {
 	absPath, err := validatePath(path, workspace, restrict)
 	if err != nil {
@@ -314,11 +390,12 @@ func cmdGrep(args []string, stdin, workspace string, restrict bool) (string, err
 
 	// Parse flags
 	var (
-		ignoreCase bool
-		invert     bool
-		count      bool
-		pattern    string
-		file       string
+		ignoreCase   bool
+		invert       bool
+		count        bool
+		lineNumbers  bool
+		pattern      string
+		file         string
 	)
 
 	i := 0
@@ -330,6 +407,8 @@ func cmdGrep(args []string, stdin, workspace string, restrict bool) (string, err
 			invert = true
 		case "-c":
 			count = true
+		case "-n":
+			lineNumbers = true
 		default:
 			return "", fmt.Errorf("grep: unrecognized option '%s'", args[i])
 		}
@@ -372,7 +451,7 @@ func cmdGrep(args []string, stdin, workspace string, restrict bool) (string, err
 	var matches []string
 	matchCount := 0
 
-	for _, line := range lines {
+	for lineNum, line := range lines {
 		var matched bool
 		if ignoreCase {
 			matched = strings.Contains(strings.ToLower(line), strings.ToLower(pattern))
@@ -387,7 +466,11 @@ func cmdGrep(args []string, stdin, workspace string, restrict bool) (string, err
 		if matched {
 			matchCount++
 			if !count {
-				matches = append(matches, line)
+				if lineNumbers {
+					matches = append(matches, fmt.Sprintf("%d:%s", lineNum+1, line))
+				} else {
+					matches = append(matches, line)
+				}
 			}
 		}
 	}
@@ -400,7 +483,7 @@ func cmdGrep(args []string, stdin, workspace string, restrict bool) (string, err
 }
 
 // cmdHead implements the head command
-func cmdHead(args []string, stdin string) (string, error) {
+func cmdHead(args []string, stdin, workspace string, restrict bool) (string, error) {
 	n := 10 // default
 
 	// Parse -n flag
@@ -423,7 +506,11 @@ func cmdHead(args []string, stdin string) (string, error) {
 	// Get input from file or stdin
 	var input string
 	if i < len(args) {
-		data, err := os.ReadFile(args[i])
+		absPath, err := validatePath(args[i], workspace, restrict)
+		if err != nil {
+			return "", fmt.Errorf("head: cannot open '%s': %v", args[i], err)
+		}
+		data, err := os.ReadFile(absPath)
 		if err != nil {
 			return "", fmt.Errorf("head: cannot open '%s': %v", args[i], err)
 		}
@@ -445,7 +532,7 @@ func cmdHead(args []string, stdin string) (string, error) {
 }
 
 // cmdTail implements the tail command
-func cmdTail(args []string, stdin string) (string, error) {
+func cmdTail(args []string, stdin, workspace string, restrict bool) (string, error) {
 	n := 10 // default
 
 	// Parse -n flag
@@ -468,7 +555,11 @@ func cmdTail(args []string, stdin string) (string, error) {
 	// Get input from file or stdin
 	var input string
 	if i < len(args) {
-		data, err := os.ReadFile(args[i])
+		absPath, err := validatePath(args[i], workspace, restrict)
+		if err != nil {
+			return "", fmt.Errorf("tail: cannot open '%s': %v", args[i], err)
+		}
+		data, err := os.ReadFile(absPath)
 		if err != nil {
 			return "", fmt.Errorf("tail: cannot open '%s': %v", args[i], err)
 		}
@@ -492,7 +583,7 @@ func cmdTail(args []string, stdin string) (string, error) {
 }
 
 // cmdWc implements the wc command
-func cmdWc(args []string, stdin string) (string, error) {
+func cmdWc(args []string, stdin, workspace string, restrict bool) (string, error) {
 	// Parse flags
 	var (
 		countLines   bool
@@ -529,8 +620,12 @@ func cmdWc(args []string, stdin string) (string, error) {
 	var input string
 	var filename string
 	if i < len(args) {
+		absPath, err := validatePath(args[i], workspace, restrict)
+		if err != nil {
+			return "", fmt.Errorf("wc: cannot open '%s': %v", args[i], err)
+		}
 		filename = args[i]
-		data, err := os.ReadFile(filename)
+		data, err := os.ReadFile(absPath)
 		if err != nil {
 			return "", fmt.Errorf("wc: cannot open '%s': %v", filename, err)
 		}
@@ -584,4 +679,355 @@ func fileType(info fs.FileInfo) string {
 	default:
 		return "unknown"
 	}
+}
+
+// cmdFind implements the find command
+func cmdFind(args []string, workspace string, restrict bool) (string, error) {
+	// Default to workspace root if no path specified
+	searchPath := workspace
+	namePattern := ""
+
+	// Parse arguments
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "-name":
+			if i+1 < len(args) {
+				namePattern = args[i+1]
+				i++
+			}
+		default:
+			// Assume it's a path
+			if !strings.HasPrefix(args[i], "-") {
+				searchPath = args[i]
+			}
+		}
+	}
+
+	// Validate path if restricted
+	if restrict {
+		var err error
+		searchPath, err = validatePath(searchPath, workspace, restrict)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	// Check if path exists
+	info, err := os.Stat(searchPath)
+	if err != nil {
+		return "", fmt.Errorf("find: '%s': %v", searchPath, err)
+	}
+
+	var results []string
+
+	if info.IsDir() {
+		// Walk directory
+		err = filepath.Walk(searchPath, func(path string, info fs.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+
+			// Apply name filter if specified
+			if namePattern != "" {
+				matched, err := filepath.Match(namePattern, info.Name())
+				if err != nil {
+					return fmt.Errorf("find: invalid pattern '%s': %v", namePattern, err)
+				}
+				if !matched {
+					return nil
+				}
+			}
+
+			results = append(results, path)
+			return nil
+		})
+		if err != nil {
+			return "", fmt.Errorf("find: %v", err)
+		}
+	} else {
+		// Single file - check if it matches pattern
+		if namePattern != "" {
+			matched, err := filepath.Match(namePattern, info.Name())
+			if err != nil {
+				return "", fmt.Errorf("find: invalid pattern '%s': %v", namePattern, err)
+			}
+			if matched {
+				results = append(results, searchPath)
+			}
+		} else {
+			results = append(results, searchPath)
+		}
+	}
+
+	if len(results) == 0 {
+		return "", nil
+	}
+
+	return strings.Join(results, "\n"), nil
+}
+
+// cmdWhich implements the which command
+func cmdWhich(args []string) (string, error) {
+	if len(args) == 0 {
+		return "", fmt.Errorf("which: usage: which <command>")
+	}
+
+	var results []string
+	for _, cmd := range args {
+		path, err := exec.LookPath(cmd)
+		if err != nil {
+			// Command not found - skip silently (like which)
+			continue
+		}
+		results = append(results, path)
+	}
+
+	if len(results) == 0 {
+		return "", nil
+	}
+
+	return strings.Join(results, "\n"), nil
+}
+
+// cmdWebFetch implements web_fetch command (simple URL fetch)
+func cmdWebFetch(args []string) (string, error) {
+	if len(args) == 0 {
+		return "", fmt.Errorf("web_fetch: usage: web_fetch <url>")
+	}
+
+	url := args[0]
+	
+	// Simple HTTP GET
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", fmt.Errorf("web_fetch: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("web_fetch: %s", resp.Status)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("web_fetch: %v", err)
+	}
+
+	return string(body), nil
+}
+
+// cmdSh executes arbitrary shell commands
+func cmdSh(args []string, stdin string) (string, error) {
+	if len(args) == 0 {
+		return "", fmt.Errorf("sh: usage: sh <command>")
+	}
+
+	// Join all args into a single command string
+	cmdStr := strings.Join(args, " ")
+	
+	// Execute via shell
+	cmd := exec.Command("sh", "-c", cmdStr)
+	
+	// Provide stdin if available
+	if stdin != "" {
+		cmd.Stdin = strings.NewReader(stdin)
+	}
+	
+	output, err := cmd.CombinedOutput()
+	result := strings.TrimSpace(string(output))
+	
+	if err != nil {
+		// Include output even on error (shell commands often output useful info)
+		if result != "" {
+			return result, nil
+		}
+		return "", fmt.Errorf("sh: %v", err)
+	}
+	
+	return result, nil
+}
+
+// cmdSed implements basic sed functionality
+func cmdSed(args []string, stdin string, workspace string, restrict bool) (string, error) {
+	if len(args) == 0 {
+		return "", fmt.Errorf("sed: usage: sed [-n] [-e script] [-f script-file] [file...]")
+	}
+
+	var (
+		scripts    []string
+		files      []string
+		quiet      bool
+		i          = 0
+	)
+
+	// Parse arguments
+	for i < len(args) {
+		if args[i] == "-n" {
+			quiet = true
+			i++
+		} else if args[i] == "-e" {
+			if i+1 >= len(args) {
+				return "", fmt.Errorf("sed: -e requires an argument")
+			}
+			scripts = append(scripts, args[i+1])
+			i += 2
+		} else if args[i] == "-f" {
+			if i+1 >= len(args) {
+				return "", fmt.Errorf("sed: -f requires an argument")
+			}
+			// Load script from file
+			scriptPath := args[i+1]
+			absPath, err := validatePath(scriptPath, workspace, restrict)
+			if err != nil {
+				return "", err
+			}
+			data, err := os.ReadFile(absPath)
+			if err != nil {
+				return "", fmt.Errorf("sed: %s: %v", scriptPath, err)
+			}
+			scripts = append(scripts, string(data))
+			i += 2
+		} else if strings.HasPrefix(args[i], "-") {
+			return "", fmt.Errorf("sed: unrecognized option '%s'", args[i])
+		} else {
+			files = append(files, args[i])
+			i++
+		}
+	}
+
+	// Get input
+	var input string
+	if len(files) == 0 {
+		input = stdin
+	} else if len(files) == 1 {
+		absPath, err := validatePath(files[0], workspace, restrict)
+		if err != nil {
+			return "", err
+		}
+		data, err := os.ReadFile(absPath)
+		if err != nil {
+			return "", fmt.Errorf("sed: %s: %v", files[0], err)
+		}
+		input = string(data)
+	} else {
+		return "", fmt.Errorf("sed: multiple files not supported")
+	}
+
+	if input == "" {
+		return "", nil
+	}
+
+	// Apply scripts
+	lines := strings.Split(input, "\n")
+	var output []string
+
+	for _, line := range lines {
+		modified := line
+		printLine := !quiet
+
+		for _, script := range scripts {
+			result, shouldPrint, err := applySedScript(modified, script)
+			if err != nil {
+				return "", fmt.Errorf("sed: %v", err)
+			}
+			modified = result
+			if shouldPrint {
+				printLine = true
+			}
+		}
+
+		if printLine {
+			output = append(output, modified)
+		}
+	}
+
+	return strings.Join(output, "\n"), nil
+}
+
+// applySedScript applies a single sed script to a line
+func applySedScript(line, script string) (string, bool, error) {
+	script = strings.TrimSpace(script)
+	if script == "" {
+		return line, true, nil
+	}
+
+	// Handle substitution: s/pattern/replacement/[flags]
+	if strings.HasPrefix(script, "s/") {
+		parts := strings.Split(script[2:], "/")
+		if len(parts) < 2 {
+			return line, true, fmt.Errorf("invalid substitution: %s", script)
+		}
+		pattern := parts[0]
+		replacement := parts[1]
+		
+		// Handle escaped slashes in pattern
+		if len(parts) > 2 {
+			// Check if there are more parts due to escaped slashes
+			for i := 2; i < len(parts); i++ {
+				if parts[i-1] == "" && i > 2 {
+					// This was an escaped slash
+					pattern += "/" + parts[i]
+				} else if i == len(parts)-1 {
+					// This is the flags part
+					break
+				} else {
+					replacement += "/" + parts[i]
+				}
+			}
+		}
+
+		// Convert sed replacement syntax to Go syntax
+		replacement = strings.ReplaceAll(replacement, "\\&", "$0")
+		replacement = strings.ReplaceAll(replacement, "\\1", "$1")
+		replacement = strings.ReplaceAll(replacement, "\\2", "$2")
+
+		// Perform substitution
+		re, err := regexp.Compile(pattern)
+		if err != nil {
+			return line, true, fmt.Errorf("invalid pattern: %v", err)
+		}
+		
+		// Check for global flag
+		flags := ""
+		if len(parts) >= 2 {
+			lastPart := parts[len(parts)-1]
+			if strings.Contains(lastPart, "g") {
+				flags = "g"
+			}
+		}
+		
+		if flags == "g" {
+			return re.ReplaceAllString(line, replacement), true, nil
+		}
+		return re.ReplaceAllString(line, replacement), true, nil
+	}
+
+	// Handle delete: /pattern/d
+	if strings.HasSuffix(script, "/d") {
+		pattern := script[1 : len(script)-2]
+		matched, err := regexp.MatchString(pattern, line)
+		if err != nil {
+			return line, true, fmt.Errorf("invalid pattern: %v", err)
+		}
+		if matched {
+			return "", false, nil // Delete = don't print
+		}
+		return line, true, nil
+	}
+
+	// Handle print: /pattern/p
+	if strings.HasSuffix(script, "/p") {
+		pattern := script[1 : len(script)-2]
+		matched, err := regexp.MatchString(pattern, line)
+		if err != nil {
+			return line, true, fmt.Errorf("invalid pattern: %v", err)
+		}
+		if matched {
+			return line, true, nil
+		}
+		return "", false, nil // Don't print if not matched
+	}
+
+	// No recognized command, return line as-is
+	return line, true, nil
 }

@@ -6,6 +6,7 @@
 package tools
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -129,6 +130,50 @@ func TestCommandRegistry_Exec_Unknown(t *testing.T) {
 	}
 	if !contains(output, "unknown command") {
 		t.Errorf("Expected 'unknown command' in error, got %q", output)
+	}
+}
+
+func TestCommandRegistry_Exec_MultiWordWithArgs(t *testing.T) {
+	r := NewCommandRegistry()
+
+	// Register a multi-word command
+	called := false
+	var receivedArgs []string
+	r.Register("memory search", "Search memory", func(args []string, stdin string) (string, error) {
+		called = true
+		receivedArgs = args
+		return "search result for: " + strings.Join(args, " "), nil
+	})
+
+	// Test with arguments
+	output := r.Exec(`memory search "2080ti"`, "")
+	if !called {
+		t.Error("Expected handler to be called")
+	}
+	if !contains(output, "search result for:") {
+		t.Errorf("Expected search result, got %q", output)
+	}
+	// Args should include the quoted string
+	if len(receivedArgs) == 0 {
+		t.Error("Expected arguments to be passed to handler")
+	}
+
+	// Reset
+	called = false
+	receivedArgs = nil
+
+	// Test multi-word command without args
+	r.Register("memory status", "Show status", func(args []string, stdin string) (string, error) {
+		called = true
+		return "status ok", nil
+	})
+
+	output = r.Exec("memory status", "")
+	if !called {
+		t.Error("Expected handler to be called for memory status")
+	}
+	if output != "status ok" {
+		t.Errorf("Expected 'status ok', got %q", output)
 	}
 }
 

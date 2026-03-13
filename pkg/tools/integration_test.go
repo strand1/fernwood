@@ -211,7 +211,7 @@ func TestCommandChaining(t *testing.T) {
 	tmpfile.Close()
 	
 	// Test the run tool with registry
-	registry := NewCommandRegistry()
+	registry := NewCommandRegistryWithFS("/tmp", false)
 	runTool := NewRunTool("/tmp", "", false)
 	runTool.SetRegistry(registry)
 	

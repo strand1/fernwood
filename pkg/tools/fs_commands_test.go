@@ -403,9 +403,10 @@ func TestCmdGrep(t *testing.T) {
 
 func TestCmdHead(t *testing.T) {
 	content := "Line 1\nLine 2\nLine 3\nLine 4\nLine 5"
+	tmpDir := t.TempDir()
 
 	// Test head default (10 lines)
-	output, err := cmdHead([]string{}, content)
+	output, err := cmdHead([]string{}, content, tmpDir, false)
 	if err != nil {
 		t.Fatalf("cmdHead failed: %v", err)
 	}
@@ -414,7 +415,7 @@ func TestCmdHead(t *testing.T) {
 	}
 
 	// Test head -n 3
-	output, err = cmdHead([]string{"-n", "3"}, content)
+	output, err = cmdHead([]string{"-n", "3"}, content, tmpDir, false)
 	if err != nil {
 		t.Fatalf("cmdHead -n failed: %v", err)
 	}
@@ -431,7 +432,7 @@ func TestCmdHead(t *testing.T) {
 	defer os.Remove(tmpFile.Name())
 	os.WriteFile(tmpFile.Name(), []byte(content), 0644)
 
-	output, err = cmdHead([]string{"-n", "2", tmpFile.Name()}, "")
+	output, err = cmdHead([]string{"-n", "2", tmpFile.Name()}, "", tmpDir, false)
 	if err != nil {
 		t.Fatalf("cmdHead from file failed: %v", err)
 	}
@@ -443,9 +444,10 @@ func TestCmdHead(t *testing.T) {
 
 func TestCmdTail(t *testing.T) {
 	content := "Line 1\nLine 2\nLine 3\nLine 4\nLine 5"
+	tmpDir := t.TempDir()
 
 	// Test tail default (10 lines)
-	output, err := cmdTail([]string{}, content)
+	output, err := cmdTail([]string{}, content, tmpDir, false)
 	if err != nil {
 		t.Fatalf("cmdTail failed: %v", err)
 	}
@@ -454,7 +456,7 @@ func TestCmdTail(t *testing.T) {
 	}
 
 	// Test tail -n 3
-	output, err = cmdTail([]string{"-n", "3"}, content)
+	output, err = cmdTail([]string{"-n", "3"}, content, tmpDir, false)
 	if err != nil {
 		t.Fatalf("cmdTail -n failed: %v", err)
 	}
@@ -471,7 +473,7 @@ func TestCmdTail(t *testing.T) {
 	defer os.Remove(tmpFile.Name())
 	os.WriteFile(tmpFile.Name(), []byte(content), 0644)
 
-	output, err = cmdTail([]string{"-n", "2", tmpFile.Name()}, "")
+	output, err = cmdTail([]string{"-n", "2", tmpFile.Name()}, "", tmpDir, false)
 	if err != nil {
 		t.Fatalf("cmdTail from file failed: %v", err)
 	}
@@ -483,9 +485,10 @@ func TestCmdTail(t *testing.T) {
 
 func TestCmdWc(t *testing.T) {
 	content := "Line 1\nLine 2\nLine 3\n"
+	tmpDir := t.TempDir()
 
 	// Test wc default (all counts)
-	output, err := cmdWc([]string{}, content)
+	output, err := cmdWc([]string{}, content, tmpDir, false)
 	if err != nil {
 		t.Fatalf("cmdWc failed: %v", err)
 	}
@@ -495,7 +498,7 @@ func TestCmdWc(t *testing.T) {
 	}
 
 	// Test wc -l (lines only)
-	output, err = cmdWc([]string{"-l"}, content)
+	output, err = cmdWc([]string{"-l"}, content, tmpDir, false)
 	if err != nil {
 		t.Fatalf("cmdWc -l failed: %v", err)
 	}
@@ -511,7 +514,7 @@ func TestCmdWc(t *testing.T) {
 	defer os.Remove(tmpFile.Name())
 	os.WriteFile(tmpFile.Name(), []byte(content), 0644)
 
-	output, err = cmdWc([]string{"-l", tmpFile.Name()}, "")
+	output, err = cmdWc([]string{"-l", tmpFile.Name()}, "", tmpDir, false)
 	if err != nil {
 		t.Fatalf("cmdWc from file failed: %v", err)
 	}
@@ -581,5 +584,31 @@ func TestNewCommandRegistryWithFS(t *testing.T) {
 	_, ok = registry.GetHandler("help")
 	if !ok {
 		t.Error("Expected 'help' command to be registered")
+	}
+}
+
+func TestCmdLsWithFlags(t *testing.T) {
+	tmpDir := t.TempDir()
+	
+	// Create test files
+	os.WriteFile(filepath.Join(tmpDir, "test.txt"), []byte("hello"), 0644)
+	os.MkdirAll(filepath.Join(tmpDir, "subdir"), 0755)
+	
+	// Test ls -la (should use shell ls)
+	result, err := cmdShellLs([]string{"-la"}, tmpDir, false)
+	if err != nil {
+		t.Fatalf("ls -la failed: %v", err)
+	}
+	
+	// Should contain detailed output
+	if !strings.Contains(result, "test.txt") {
+		t.Errorf("Expected test.txt in output, got: %s", result)
+	}
+	if !strings.Contains(result, "subdir") {
+		t.Errorf("Expected subdir in output, got: %s", result)
+	}
+	// -l flag should show permissions/ownership
+	if !strings.Contains(result, "drwx") && !strings.Contains(result, "-rw") {
+		t.Logf("Note: ls -la output doesn't show permissions: %s", result)
 	}
 }

@@ -21,7 +21,8 @@ import (
 
 // RegisterMemoryCommands registers all memory commands to the registry.
 // These commands wrap the Mulch CLI for all memory operations.
-func RegisterMemoryCommands(registry *CommandRegistry) {
+// workspace: directory where .mulch/ lives (mulch commands run from here)
+func RegisterMemoryCommands(registry *CommandRegistry, workspace string) {
 	// memory store - Record a fact/learning
 	registry.Register("memory store", "Store a fact or learning (alias: memory record)", func(args []string, stdin string) (string, error) {
 		if len(args) < 2 {
@@ -32,21 +33,62 @@ func RegisterMemoryCommands(registry *CommandRegistry) {
 		if stdin != "" {
 			content = stdin
 		}
-		return cmdMemoryStore(domain, "convention", content)
+		return cmdMemoryStore(workspace, domain, "convention", content)
 	})
 
-	// memory record - Record with explicit type
-	registry.Register("memory record", "Record a learning with type (memory record <domain> <type> <content>)", func(args []string, stdin string) (string, error) {
-		if len(args) < 3 {
-			return "", fmt.Errorf("memory record: usage: memory record <domain> <type> <content>")
+	// memory record - Record with explicit type and optional flags
+	registry.Register("memory record", "Record a learning with type (memory record <domain> <type> [--title X] [--rationale Y] [--name X] [--description Y] [--resolution Y] <content>)", func(args []string, stdin string) (string, error) {
+		if len(args) < 2 {
+			return "", fmt.Errorf("memory record: usage: memory record <domain> <type> [--title X] [--rationale Y] [--name X] [--description Y] [--resolution Y] <content>")
 		}
 		domain := args[0]
 		recType := args[1]
-		content := strings.Join(args[2:], " ")
+
+		// Parse flags and remaining content
+		var title, rationale, name, description, resolution, content string
+		var remainingArgs []string
+
+		for i := 2; i < len(args); i++ {
+			switch args[i] {
+			case "--title":
+				if i+1 < len(args) {
+					title = args[i+1]
+					i++
+				}
+			case "--rationale":
+				if i+1 < len(args) {
+					rationale = args[i+1]
+					i++
+				}
+			case "--name":
+				if i+1 < len(args) {
+					name = args[i+1]
+					i++
+				}
+			case "--description":
+				if i+1 < len(args) {
+					description = args[i+1]
+					i++
+				}
+			case "--resolution":
+				if i+1 < len(args) {
+					resolution = args[i+1]
+					i++
+				}
+			default:
+				remainingArgs = append(remainingArgs, args[i])
+			}
+		}
+
+		// Join remaining args as content
+		if len(remainingArgs) > 0 {
+			content = strings.Join(remainingArgs, " ")
+		}
 		if stdin != "" {
 			content = stdin
 		}
-		return cmdMemoryStore(domain, recType, content)
+
+		return cmdMemoryRecordWithFlags(workspace, domain, recType, title, rationale, name, description, resolution, content)
 	})
 
 	// memory facts - List facts in a domain
@@ -54,7 +96,7 @@ func RegisterMemoryCommands(registry *CommandRegistry) {
 		if len(args) == 0 {
 			return "", fmt.Errorf("memory facts: usage: memory facts <domain>")
 		}
-		return cmdMemoryFacts(args[0])
+		return cmdMemoryFacts(workspace, args[0])
 	})
 
 	// memory search - Search across all domains
@@ -66,7 +108,7 @@ func RegisterMemoryCommands(registry *CommandRegistry) {
 		if stdin != "" {
 			query = stdin
 		}
-		return cmdMemorySearch(query)
+		return cmdMemorySearch(workspace, query)
 	})
 
 	// memory query - Query a specific domain
@@ -74,7 +116,7 @@ func RegisterMemoryCommands(registry *CommandRegistry) {
 		if len(args) == 0 {
 			return "", fmt.Errorf("memory query: usage: memory query <domain>")
 		}
-		return cmdMemoryQuery(args[0])
+		return cmdMemoryQuery(workspace, args[0])
 	})
 
 	// memory forget - Delete a record
@@ -82,12 +124,12 @@ func RegisterMemoryCommands(registry *CommandRegistry) {
 		if len(args) < 2 {
 			return "", fmt.Errorf("memory forget: usage: memory forget <domain> <id>")
 		}
-		return cmdMemoryForget(args[0], args[1])
+		return cmdMemoryForget(workspace, args[0], args[1])
 	})
 
 	// memory status - Show mulch status
 	registry.Register("memory status", "Show mulch status (domains, record counts)", func(args []string, stdin string) (string, error) {
-		return cmdMemoryStatus()
+		return cmdMemoryStatus(workspace)
 	})
 
 	// Aliases
@@ -100,8 +142,8 @@ func RegisterMemoryCommands(registry *CommandRegistry) {
 	registry.RegisterAlias("mem.status", "memory status")
 }
 
-// cmdMemoryStore records a learning via mulch record
-func cmdMemoryStore(domain, recType, content string) (string, error) {
+// cmdMemoryRecordWithFlags records a learning via mulch record with proper flag handling per type
+func cmdMemoryRecordWithFlags(workspace, domain, recType, title, rationale, name, description, resolution, content string) (string, error) {
 	// Validate record type
 	validTypes := []string{"convention", "pattern", "failure", "decision", "reference", "guide"}
 	recType = strings.ToLower(recType)
@@ -116,8 +158,98 @@ func cmdMemoryStore(domain, recType, content string) (string, error) {
 		return "", fmt.Errorf("memory record: invalid type '%s'. Valid types: %s", recType, strings.Join(validTypes, ", "))
 	}
 
-	// Execute: mulch record <domain> --type <type> --description "<content>"
-	cmd := exec.Command("mulch", "record", domain, "--type", recType, "--description", content)
+	// Build mulch record command based on type requirements
+	// Per Mulch docs:
+	//   convention: [content] or --description
+	//   pattern: --name, --description (or [content])
+	//   failure: --description, --resolution
+	//   decision: --title, --rationale
+	//   reference: --name, --description (or [content])
+	//   guide: --name, --description (or [content])
+
+	var cmdArgs []string
+	cmdArgs = append(cmdArgs, "record", domain, "--type", recType)
+
+	switch recType {
+	case "decision":
+		// Decision requires --title and --rationale
+		if title == "" || rationale == "" {
+			// Try to parse from content if it's JSON
+			if parsedTitle, parsedRationale, ok := parseDecisionJSON(content); ok {
+				title = parsedTitle
+				rationale = parsedRationale
+			}
+		}
+		if title == "" {
+			return "", fmt.Errorf("memory record: decision records require --title")
+		}
+		if rationale == "" {
+			return "", fmt.Errorf("memory record: decision records require --rationale")
+		}
+		cmdArgs = append(cmdArgs, "--title", title, "--rationale", rationale)
+
+	case "failure":
+		// Failure requires --description and --resolution
+		if description == "" && content != "" {
+			description = content
+		}
+		if resolution == "" {
+			// Try to parse from content if it's JSON
+			if parsedDesc, parsedRes, ok := parseFailureJSON(content); ok {
+				description = parsedDesc
+				resolution = parsedRes
+			}
+		}
+		if description == "" {
+			return "", fmt.Errorf("memory record: failure records require --description")
+		}
+		if resolution == "" {
+			return "", fmt.Errorf("memory record: failure records require --resolution")
+		}
+		cmdArgs = append(cmdArgs, "--description", description, "--resolution", resolution)
+
+	case "pattern", "reference", "guide":
+		// These require --name and --description (or positional content)
+		if name == "" || description == "" {
+			// Try to parse from content if it's JSON
+			if parsedName, parsedDesc, ok := parseNamedRecordJSON(content); ok {
+				if name == "" {
+					name = parsedName
+				}
+				if description == "" {
+					description = parsedDesc
+				}
+			}
+		}
+		if name == "" && description == "" {
+			// Use positional content
+			if content == "" {
+				return "", fmt.Errorf("memory record: %s records require --name and --description (or positional content)", recType)
+			}
+			cmdArgs = append(cmdArgs, content)
+		} else {
+			if name != "" {
+				cmdArgs = append(cmdArgs, "--name", name)
+			}
+			if description != "" {
+				cmdArgs = append(cmdArgs, "--description", description)
+			}
+		}
+
+	case "convention":
+		// Convention accepts [content] or --description
+		if description != "" {
+			cmdArgs = append(cmdArgs, "--description", description)
+		} else if content != "" {
+			cmdArgs = append(cmdArgs, content)
+		} else {
+			return "", fmt.Errorf("memory record: convention records require content or --description")
+		}
+	}
+
+	// Execute the command
+	cmd := exec.Command("mulch", cmdArgs...)
+	cmd.Dir = workspace
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("mulch record failed: %v\n%s", err, string(out))
@@ -126,10 +258,82 @@ func cmdMemoryStore(domain, recType, content string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+// parseDecisionJSON tries to parse title and rationale from JSON content
+func parseDecisionJSON(content string) (title, rationale string, ok bool) {
+	content = strings.TrimSpace(content)
+	if !strings.HasPrefix(content, "{") {
+		return "", "", false
+	}
+	var data map[string]interface{}
+	if err := json.Unmarshal([]byte(content), &data); err != nil {
+		return "", "", false
+	}
+	titleVal, hasTitle := data["title"]
+	rationaleVal, hasRationale := data["rationale"]
+	if hasTitle && hasRationale {
+		if titleStr, ok := titleVal.(string); ok {
+			if rationaleStr, ok := rationaleVal.(string); ok {
+				return titleStr, rationaleStr, true
+			}
+		}
+	}
+	return "", "", false
+}
+
+// parseFailureJSON tries to parse description and resolution from JSON content
+func parseFailureJSON(content string) (description, resolution string, ok bool) {
+	content = strings.TrimSpace(content)
+	if !strings.HasPrefix(content, "{") {
+		return "", "", false
+	}
+	var data map[string]interface{}
+	if err := json.Unmarshal([]byte(content), &data); err != nil {
+		return "", "", false
+	}
+	descVal, hasDesc := data["description"]
+	resVal, hasRes := data["resolution"]
+	if hasDesc && hasRes {
+		if descStr, ok := descVal.(string); ok {
+			if resStr, ok := resVal.(string); ok {
+				return descStr, resStr, true
+			}
+		}
+	}
+	return "", "", false
+}
+
+// parseNamedRecordJSON tries to parse name and description from JSON content
+func parseNamedRecordJSON(content string) (name, description string, ok bool) {
+	content = strings.TrimSpace(content)
+	if !strings.HasPrefix(content, "{") {
+		return "", "", false
+	}
+	var data map[string]interface{}
+	if err := json.Unmarshal([]byte(content), &data); err != nil {
+		return "", "", false
+	}
+	nameVal, hasName := data["name"]
+	descVal, hasDesc := data["description"]
+	if hasName && hasDesc {
+		if nameStr, ok := nameVal.(string); ok {
+			if descStr, ok := descVal.(string); ok {
+				return nameStr, descStr, true
+			}
+		}
+	}
+	return "", "", false
+}
+
+// cmdMemoryStore records a learning via mulch record (simple interface for convention type)
+func cmdMemoryStore(workspace, domain, recType, content string) (string, error) {
+	return cmdMemoryRecordWithFlags(workspace, domain, recType, "", "", "", "", "", content)
+}
+
 // cmdMemoryFacts lists records in a domain via mulch query
-func cmdMemoryFacts(domain string) (string, error) {
+func cmdMemoryFacts(workspace, domain string) (string, error) {
 	// Execute: mulch query <domain>
 	cmd := exec.Command("mulch", "query", domain)
+	cmd.Dir = workspace
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("mulch query failed: %v\n%s", err, string(out))
@@ -139,9 +343,10 @@ func cmdMemoryFacts(domain string) (string, error) {
 }
 
 // cmdMemorySearch searches across all domains via mulch search
-func cmdMemorySearch(query string) (string, error) {
+func cmdMemorySearch(workspace, query string) (string, error) {
 	// Execute: mulch search <query>
 	cmd := exec.Command("mulch", "search", query)
+	cmd.Dir = workspace
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("mulch search failed: %v\n%s", err, string(out))
@@ -151,9 +356,10 @@ func cmdMemorySearch(query string) (string, error) {
 }
 
 // cmdMemoryQuery queries a specific domain via mulch prime
-func cmdMemoryQuery(domain string) (string, error) {
+func cmdMemoryQuery(workspace, domain string) (string, error) {
 	// Execute: mulch prime <domain>
 	cmd := exec.Command("mulch", "prime", domain)
+	cmd.Dir = workspace
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("mulch prime failed: %v\n%s", err, string(out))
@@ -163,9 +369,10 @@ func cmdMemoryQuery(domain string) (string, error) {
 }
 
 // cmdMemoryForget deletes a record via mulch delete
-func cmdMemoryForget(domain, id string) (string, error) {
+func cmdMemoryForget(workspace, domain, id string) (string, error) {
 	// Execute: mulch delete <domain> <id>
 	cmd := exec.Command("mulch", "delete", domain, id)
+	cmd.Dir = workspace
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("mulch delete failed: %v\n%s", err, string(out))
@@ -175,9 +382,10 @@ func cmdMemoryForget(domain, id string) (string, error) {
 }
 
 // cmdMemoryStatus shows mulch status
-func cmdMemoryStatus() (string, error) {
+func cmdMemoryStatus(workspace string) (string, error) {
 	// Execute: mulch status
 	cmd := exec.Command("mulch", "status")
+	cmd.Dir = workspace
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("mulch status failed: %v\n%s", err, string(out))

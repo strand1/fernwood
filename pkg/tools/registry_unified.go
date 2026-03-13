@@ -47,14 +47,15 @@ func NewCommandRegistryWithFS(workspace string, restrict bool) *CommandRegistry 
 	return r
 }
 
-// NewCommandRegistryFull creates a new command registry with all commands (FS, memory, topic).
+// NewCommandRegistryFull creates a new command registry with all commands (FS, memory, topic, skills).
 // workspace: base directory for relative paths
 // restrict: if true, restrict all operations to workspace
 // sessionStorage: path to session storage directory
 func NewCommandRegistryFull(workspace, sessionStorage string, restrict bool) *CommandRegistry {
 	r := NewCommandRegistryWithFS(workspace, restrict)
-	RegisterMemoryCommands(r)
+	RegisterMemoryCommands(r, workspace)
 	RegisterTopicCommands(r, sessionStorage)
+	RegisterSkillCommands(r, workspace)
 	return r
 }
 
@@ -160,6 +161,11 @@ func (r *CommandRegistry) HelpText() string {
 			fmt.Fprintf(&b, "  %s → %s\n", alias, target)
 		}
 	}
+
+	// Note about shell auto-fallback
+	b.WriteString("\nNote: Unknown commands are automatically executed via shell (sh -c).\n")
+	b.WriteString("      You can use any shell command: sed, awk, find, git, python3, etc.\n")
+	b.WriteString("      Pipes (|), redirects (>), &&, || all work naturally.\n")
 
 	return b.String()
 }

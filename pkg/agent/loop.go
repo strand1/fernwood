@@ -1274,7 +1274,7 @@ func (al *AgentLoop) maybeSummarize(agent *AgentInstance, sessionKey, channel, c
 
 
 // runReflectionLoop runs a mini agent loop to record learnings from the provided messages.
-// It returns the number of successful mulch_record calls made.
+// It returns the number of successful memory record calls made (via the run tool).
 func (al *AgentLoop) runReflectionLoop(ctx context.Context, agent *AgentInstance, history []providers.Message) (int, error) {
 	domainIndex := agent.ContextBuilder.mulch.LoadDomainIndex()
 	systemPrompt := fmt.Sprintf(`You are reviewing a conversation to extract permanent learnings into a knowledge base.
@@ -1282,13 +1282,13 @@ func (al *AgentLoop) runReflectionLoop(ctx context.Context, agent *AgentInstance
 Available domains:
 %s
 
-Use mulch_record to save anything worth keeping permanently:
+Use run(command='memory record <domain> <type> <content>') to save anything worth keeping permanently:
 - Failures (errors encountered and how they were resolved)
 - Decisions (why specific choices were made)
 - Patterns/Conventions (reusable solutions, standards)
 - References (useful tools, resources, links)
 
-Use mulch_query if you need to check what's already recorded in a domain.
+Use run(command='memory query <domain>') if you need to check what's already recorded in a domain.
 Create new domains freely if the topic doesn't fit existing ones.
 When finished recording all learnings, respond with exactly: REFLECTION_DONE`, domainIndex)
 	systemMsg := providers.Message{Role: "system", Content: systemPrompt}
@@ -1300,8 +1300,8 @@ When finished recording all learnings, respond with exactly: REFLECTION_DONE`, d
 	messages = append(messages, history...)
 	messages = append(messages, userMsg)
 
-	// Only allow mulch_record and mulch_query tools during reflection.
-	toolNames := []string{"mulch_record", "mulch_query"}
+	// Only allow run tool during reflection (for memory record/query commands).
+	toolNames := []string{"run"}
 	toolDefs := make([]providers.ToolDefinition, 0, len(toolNames))
 	for _, name := range toolNames {
 		tool, ok := agent.Tools.Get(name)
@@ -1366,9 +1366,14 @@ When finished recording all learnings, respond with exactly: REFLECTION_DONE`, d
 			}
 			messages = append(messages, toolMsg)
 
-			// Count successful mulch_record calls
-			if norm.Name == "mulch_record" && !result.IsError {
-				recordCount++
+			// Count successful memory record calls (via run tool)
+			if norm.Name == "run" && !result.IsError {
+				// Check if the command was a memory record command
+				if args, ok := norm.Arguments["command"].(string); ok {
+					if strings.Contains(args, "memory record") {
+						recordCount++
+					}
+				}
 			}
 		}
 	}

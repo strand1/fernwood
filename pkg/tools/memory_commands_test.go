@@ -17,7 +17,7 @@ import (
 
 func TestRegisterMemoryCommands(t *testing.T) {
 	registry := NewCommandRegistry()
-	RegisterMemoryCommands(registry)
+	RegisterMemoryCommands(registry, "/tmp/test")
 
 	// Test that memory commands are registered
 	memoryCommands := []string{
@@ -351,5 +351,163 @@ func createTestSession(t *testing.T, storage, key, summary string) {
 
 	if err := saveSession(storage, sess); err != nil {
 		t.Fatalf("Failed to create test session: %v", err)
+	}
+}
+
+// TestParseDecisionJSON tests parsing decision records from JSON
+func TestParseDecisionJSON(t *testing.T) {
+	tests := []struct {
+		name          string
+		content       string
+		wantTitle     string
+		wantRationale string
+		wantOk        bool
+	}{
+		{
+			name:          "valid JSON with title and rationale",
+			content:       `{"title":"Test Decision","rationale":"This is the rationale"}`,
+			wantTitle:     "Test Decision",
+			wantRationale: "This is the rationale",
+			wantOk:        true,
+		},
+		{
+			name:          "invalid JSON",
+			content:       `{invalid json}`,
+			wantTitle:     "",
+			wantRationale: "",
+			wantOk:        false,
+		},
+		{
+			name:          "missing title",
+			content:       `{"rationale":"This is the rationale"}`,
+			wantTitle:     "",
+			wantRationale: "",
+			wantOk:        false,
+		},
+		{
+			name:          "missing rationale",
+			content:       `{"title":"Test Decision"}`,
+			wantTitle:     "",
+			wantRationale: "",
+			wantOk:        false,
+		},
+		{
+			name:          "not JSON",
+			content:       "Just plain text",
+			wantTitle:     "",
+			wantRationale: "",
+			wantOk:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			title, rationale, ok := parseDecisionJSON(tt.content)
+			if ok != tt.wantOk {
+				t.Errorf("parseDecisionJSON() ok = %v, want %v", ok, tt.wantOk)
+			}
+			if title != tt.wantTitle {
+				t.Errorf("parseDecisionJSON() title = %q, want %q", title, tt.wantTitle)
+			}
+			if rationale != tt.wantRationale {
+				t.Errorf("parseDecisionJSON() rationale = %q, want %q", rationale, tt.wantRationale)
+			}
+		})
+	}
+}
+
+// TestParseFailureJSON tests parsing failure records from JSON
+func TestParseFailureJSON(t *testing.T) {
+	tests := []struct {
+		name           string
+		content        string
+		wantDesc       string
+		wantResolution string
+		wantOk         bool
+	}{
+		{
+			name:           "valid JSON with description and resolution",
+			content:        `{"description":"Something failed","resolution":"Fixed it"}`,
+			wantDesc:       "Something failed",
+			wantResolution: "Fixed it",
+			wantOk:         true,
+		},
+		{
+			name:           "missing description",
+			content:        `{"resolution":"Fixed it"}`,
+			wantDesc:       "",
+			wantResolution: "",
+			wantOk:         false,
+		},
+		{
+			name:           "missing resolution",
+			content:        `{"description":"Something failed"}`,
+			wantDesc:       "",
+			wantResolution: "",
+			wantOk:         false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			desc, resolution, ok := parseFailureJSON(tt.content)
+			if ok != tt.wantOk {
+				t.Errorf("parseFailureJSON() ok = %v, want %v", ok, tt.wantOk)
+			}
+			if desc != tt.wantDesc {
+				t.Errorf("parseFailureJSON() description = %q, want %q", desc, tt.wantDesc)
+			}
+			if resolution != tt.wantResolution {
+				t.Errorf("parseFailureJSON() resolution = %q, want %q", resolution, tt.wantResolution)
+			}
+		})
+	}
+}
+
+// TestParseNamedRecordJSON tests parsing named records from JSON
+func TestParseNamedRecordJSON(t *testing.T) {
+	tests := []struct {
+		name        string
+		content     string
+		wantName    string
+		wantDesc    string
+		wantOk      bool
+	}{
+		{
+			name:     "valid JSON with name and description",
+			content:  `{"name":"Test Pattern","description":"This is a pattern"}`,
+			wantName: "Test Pattern",
+			wantDesc: "This is a pattern",
+			wantOk:   true,
+		},
+		{
+			name:     "missing name",
+			content:  `{"description":"This is a pattern"}`,
+			wantName: "",
+			wantDesc: "",
+			wantOk:   false,
+		},
+		{
+			name:     "missing description",
+			content:  `{"name":"Test Pattern"}`,
+			wantName: "",
+			wantDesc: "",
+			wantOk:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			name, desc, ok := parseNamedRecordJSON(tt.content)
+			if ok != tt.wantOk {
+				t.Errorf("parseNamedRecordJSON() ok = %v, want %v", ok, tt.wantOk)
+			}
+			if name != tt.wantName {
+				t.Errorf("parseNamedRecordJSON() name = %q, want %q", name, tt.wantName)
+			}
+			if desc != tt.wantDesc {
+				t.Errorf("parseNamedRecordJSON() description = %q, want %q", desc, tt.wantDesc)
+			}
+		})
 	}
 }

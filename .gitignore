@@ -67,3 +67,20 @@ AGENTS.md
 TEST_FAILURES.md
 TODO.md
 .mulch/
+
+# Personal development environment (Sapling)
+.sapling/
+
+# Temporary files and notes
+.ipynb_checkpoints/
+BUILD_SUMMARY.md
+TESTING_NOTES.md
+test-results.txt
+
+# Skills (work in progress)
+skills/
+workspace/skills/
+cmd/fernwood/internal/onboard/workspace/skills/
+
+# Git attributes (auto-generated)
+.gitattributes

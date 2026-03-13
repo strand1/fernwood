@@ -68,26 +68,51 @@ func execChain(registry *CommandRegistry, segments []Segment, initialStdin strin
 // stdin: standard input for the command
 // Returns: output string and error flag (true if command failed)
 func execSingle(registry *CommandRegistry, command, stdin string) (string, bool) {
-	// Tokenize the command to extract command name and arguments
+	// Tokenize the command first
 	parts := tokenizeCommand(command)
 	if len(parts) == 0 {
 		return "[error] empty command", true
 	}
 
-	name := parts[0]
-	args := parts[1:]
+	// Try progressively longer prefixes to find multi-word commands
+	// e.g., "memory search \"2080ti\"" -> try "memory", then "memory search"
+	var handler CommandHandler
+	var ok bool
+	var cmdName string
+	var args []string
 
-	// Get handler for this command
-	handler, ok := registry.GetHandler(name)
+	for i := len(parts); i >= 1; i-- {
+		cmdName = strings.Join(parts[:i], " ")
+		args = parts[i:]
+		handler, ok = registry.GetHandler(cmdName)
+		if ok {
+			break
+		}
+	}
+
 	if !ok {
+		// No match found - auto-fallback to shell execution
+		// This allows the agent to use any shell command naturally
+		// Reconstruct the full command string from parts
+		fullCmd := strings.Join(parts, " ")
+		handler, ok := registry.GetHandler("sh")
+		if ok {
+			// Execute via shell
+			out, err := handler([]string{fullCmd}, stdin)
+			if err != nil {
+				return formatCommandError(fullCmd, err), true
+			}
+			return out, false
+		}
+		// No shell handler available - return error
 		available := registry.List()
-		return formatUnknownCommandError(name, available), true
+		return formatUnknownCommandError(parts[0], available), true
 	}
 
 	// Execute the command
 	out, err := handler(args, stdin)
 	if err != nil {
-		return formatCommandError(name, err), true
+		return formatCommandError(cmdName, err), true
 	}
 
 	return out, false
