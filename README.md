@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Terminal-based coding agent.</strong><br/>
-  Forked from PicoClaw, with persistent memory.
+  Forked from [PicoClaw](https://github.com/sipeed/picoclaw), with persistent memory.
 </p>
 
 <p align="center">
