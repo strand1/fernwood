@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://golang.org/dl/"><img src="https://img.shields.io/badge/Go-1.26.1-00ADD8?style=flat&logo=go&logoColor=white" alt="Go"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"/></a>
-  <img src="https://img.shields.io/badge/status-production--ready-blue" alt="Production Ready"/>
+  <img src="https://img.shields.io/badge/status-development-yellow" alt="Development"/>
 </p>
 
 <p align="center">
@@ -166,7 +166,7 @@ Fernwood integrates with [Mulch](https://github.com/jayminwest/mulch) for persis
 
 2. **Session-End Reflection** — Before `/clear`, Fernwood automatically reflects and records valuable learnings.
 
-3. **On-Demand Retrieval** — Domain summaries load at startup; full content retrieved via `memory query <domain>`, so when discussing a topic fernwood will remember key points.
+3. **On-Demand Retrieval** — Domain summaries load at startup; full content retrieved via `memory query <domain>`, so when discussing a topic Fernwood will remember key points.
 
 *Powered by [Mulch](https://github.com/jayminwest/mulch) — persistent expertise management.* 
 
