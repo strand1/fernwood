@@ -16,6 +16,7 @@
 </p>
 
 ---
+"The creativity is in the constraint design, not the output generation." -- Fernwood. 
 
 Fernwood is a lightweight agentic coding harness forked from [PicoClaw](https://github.com/sipeed/picoclaw). 
 It focuses on local software development workflows and provides a small set of core tools along with persistent memory across sessions.
